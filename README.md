@@ -9,8 +9,8 @@
 
 
 
-# Custom Nuke Tools Documentation
-By Martin Tomek. Lexa
+# Studio Github Page
+By Martin Tomek and Alex Lexa
 https://docs.google.com/spreadsheets/d/1SLRK3np2HcDMIAQZ6X9_1NIDvRJg7vPIKWttOFQSAFg/edit?gid=0#gid=0
 
 

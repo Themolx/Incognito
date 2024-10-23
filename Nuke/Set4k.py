@@ -1,9 +1,48 @@
-
-
 import nuke
 import nukescripts
+import os
+
+def get_project_name_from_path():
+    script_path = nuke.root().name()
+    
+    if not script_path:
+        print("No script is currently loaded.")
+        return None
+        
+    # Split the path into components
+    path_parts = script_path.split('/')
+    # Convert backslashes to forward slashes if needed
+    if len(path_parts) <= 1:
+        path_parts = script_path.split('\\')
+    
+    # Find the project folder (should be right after the drive letter)
+    for part in path_parts:
+        if part == "3PRINCEZNY_02421":
+            return part
+            
+    # Alternative method: get the second element after splitting by disk letter
+    try:
+        without_drive = script_path.split(':', 1)[1]
+        cleaned_path = without_drive.strip('/\\')
+        first_folder = cleaned_path.split('/')[0].split('\\')[0]
+        
+        if first_folder == "3PRINCEZNY_02421":
+            return first_folder
+    except:
+        pass
+        
+    print("This script is not part of the 3PRINCEZNY_02421 project.")
+    return None
 
 def setup_4k_uhd_project():
+    # First check if this is the correct project
+    project_name = get_project_name_from_path()
+    if project_name != "3PRINCEZNY_02421":
+        print("Resolution setup skipped - not in 3PRINCEZNY_02421 project")
+        return
+        
+    print(f"Setting up 4K UHD format for {project_name}")
+    
     root = nuke.root()
     format_knob = root['format']
     

@@ -2,18 +2,49 @@ set cut_paste_input [stack 0]
 version 14.0 v5
 push $cut_paste_input
 NoOp {
-name PNG_Converter
-help "Creates a Write node configured for PNG RGBA output with _png_sRGB suffix.\nCreated by Martin Tomek (https://github.com/Themolx)"
-tile_color 0xff9455ff
-selected true
-xpos 4673
-ypos 3066
-addUserKnob {20 converter_tab l "PNG Converter"}
-addUserKnob {26 title l "" +STARTLINE T "<b>PNG Image Converter</b>"}
-addUserKnob {26 description l "" +STARTLINE T "Creates a preconfigured Write node for PNG RGBA output.\nAutomatically sets up _png_sRGB suffix and color_picking colorspace."}
-addUserKnob {22 create l "Create PNG Write" t "Creates a Write node configured for PNG RGBA output" T "node = nuke.thisNode()\n\n# Create Write node\nwrite_node = nuke.createNode('Write', inpanel=False)\n\n# Position write node below this node\nwrite_node.setXYpos(node.xpos(), node.ypos() + 100)\n\n# Connect write node to this node's input\nwrite_node.setInput(0, node)\n\n# Get input node's file path if it's a Read node\ninput_node = node.input(0)\nif input_node and input_node.Class() == 'Read':\n    original_path = input_node\['file'].value()\n    import os\n    path_without_ext = os.path.splitext(original_path)\[0]\n    new_path = path_without_ext + '_png_sRGB.png'\n    write_node\['file'].setValue(new_path)\n\n# Configure write node settings\nwrite_node\['channels'].setValue('rgba')\nwrite_node\['file_type'].setValue('png')\nwrite_node\['create_directories'].setValue(True)\nwrite_node\['checkHashOnRead'].setValue(False)\nwrite_node\['colorspace'].setValue('color_picking')" +STARTLINE}
-addUserKnob {26 divider l "" +STARTLINE}
-addUserKnob {26 version_label l Version T v1.0}
-addUserKnob {26 author_label l Author T "Martin Tomek"}
-addUserKnob {26 github_label l GitHub T https://github.com/Themolx}
+ name PNG_Converter
+ help "Creates a Write node configured for PNG RGBA output with frame numbers at the end of the path.\nCreated by Martin Tomek (https://github.com/Themolx)"
+ selected true
+ xpos 0
+ ypos 0
+ tile_color 0xff9455ff
+ addUserKnob {20 converter_tab l "PNG Converter"}
+ addUserKnob {26 title l "" +STARTLINE T "<b>PNG Image Converter</b>"}
+ addUserKnob {26 description l "" +STARTLINE T "Creates a preconfigured Write node for PNG RGBA output.\nAutomatically sets up PNG suffix with frame numbers at the end of the path."}
+ addUserKnob {22 create l "Create PNG Write" t "Creates a Write node configured for PNG RGBA output" T "node = nuke.thisNode()
+# Create Write node
+write_node = nuke.createNode('Write', inpanel=False)
+# Position write node below this node
+write_node.setXYpos(node.xpos(), node.ypos() + 100)
+# Connect write node to this node's input
+write_node.setInput(0, node)
+# Get input node's file path if it's a Read node
+input_node = node.input(0)
+if input_node and input_node.Class() == 'Read':
+    original_path = input_node\['file'].value()
+    import os
+    
+    # Split the path into components
+    directory = os.path.dirname(original_path)
+    filename = os.path.basename(original_path)
+    name_without_ext = os.path.splitext(filename)[0]
+    
+    # Remove any existing frame patterns from the filename
+    import re
+    name_clean = re.sub(r'\.?%\d*d|\.?\#+', '', name_without_ext)
+    
+    # Construct new path with frame pattern at the end
+    new_path = os.path.join(directory, name_clean + '_png_sRGB.%04d.png')
+    write_node\['file'].setValue(new_path)
+
+# Configure write node settings
+write_node\['channels'].setValue('rgba')
+write_node\['file_type'].setValue('png')
+write_node\['create_directories'].setValue(True)
+write_node\['checkHashOnRead'].setValue(False)
+write_node\['colorspace'].setValue('color_picking')" +STARTLINE}
+ addUserKnob {26 divider l "" +STARTLINE}
+ addUserKnob {26 version_label l Version T v1.1}
+ addUserKnob {26 author_label l Author T "Martin Tomek"}
+ addUserKnob {26 github_label l GitHub T "https://github.com/Themolx"}
 }

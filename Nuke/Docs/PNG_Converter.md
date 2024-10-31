@@ -8,7 +8,6 @@ Node, který automaticky vytvoří Write node s přednastavenými parametry pro 
 - RGBA kanály
 - Color_picking barevný prostor
 - Přípona "_png_sRGB"
-- Automatické vytváření složek
 
 ### **Jak na to**
 1. Stáhněte [PNG_Converter.nk](https://github.com/Themolx/Incognito/blob/main/Nuke/PNG_Converter.nk)

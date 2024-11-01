@@ -1,32 +1,33 @@
+# Zpětné lomítko v Discord zprávách
 
-### **Problém: Discord Automaticky Odstraňuje "\" Pokud Je Před Ní "_”**
+## Problém
+Discord automaticky odstraňuje zpětné lomítko (`\`) pokud je umístěno před podtržítkem (`_`). Toto chování způsobuje problémy při sdílení cest k souborům v týmové komunikaci.
 
-**Popis problému:**
-Při vkládání cest k souborům do Discordu bylo zjištěno, že Discord automaticky odstraní znak "\" (zpětné lomítko), pokud je umístěno před podtržítkem "_". To může vést k nesprávnému zobrazení cest, což způsobuje zmatky nebo potenciální chyby při komunikaci ohledně cest k souborům.
-
-**Kroky k reprodukci:**
-1. Vložte cestu k souboru do Discordu ve formátu `P:\EPET3D_02413\sources\_client_to\240828_previews`.
-2. Všimněte si, že Discord automaticky odstraní "\" po podtržítku "_".
-
-**Očekávané chování:**
-Cesta k souboru by měla být zobrazena správně, s ponechanými "\" jako v původním vloženém textu.
-
-**Příčina:**
-Jde o chování v parseru Discordu, který interpretuje "\" následované "_" jako escape sekvenci nebo jednoduše odstraní zpětné lomítko, čímž naruší formátování zamýšlené cesty.
-
-**Řešení:**
-Při vkládání do Discordu obalte cestu do trojitých zpětných apostrofů nebo do jednoduchých uvozovek. Tím zabráníte Discordu v modifikaci "\" a zajistíte správné zobrazení cesty.
-
-**Příklad řešení:**
-Použijte následující formát:
-\```
-`P:\EPET3D_02413\sources\_client_to\240828_previews`
-\```
-nebo
-\```
-\```
+### Příklad problematické cesty
+```
 P:\EPET3D_02413\sources\_client_to\240828_previews
-\```
-\```
+```
 
-Tato metoda zaručuje, že cesta zůstane neporušená a bude jasně komunikována ostatním členům týmu na Discordu.
+## Řešení
+Použijte zpětné apostrofy (backticks) kolem celé cesty:
+```
+`P:\EPET3D_02413\sources\_client_to\240828_previews`
+```
+
+## Jak napsat backtick (`)
+
+### Backtick na různých klávesnicích
+- **Česká klávesnice**: Zpětný apostrof je pod klávesou Esc
+- **Anglická klávesnice**: Pod klávesou Esc (vlevo nahoře)
+
+### Zpětné lomítko (\)
+- **Česká klávesnice**: `Shift + klávesa vlevo od Enter`
+- **Anglická klávesnice**: Klávesa vlevo od Enter
+
+Pro více řádků použijte trojité backticks:
+````
+```
+P:\EPET3D_02413\sources\_client_to\240828_previews
+P:\EPET3D_02413\sources\_client_to\another_path
+```
+````

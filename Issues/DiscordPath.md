@@ -21,8 +21,8 @@ Použijte zpětné apostrofy (backticks) kolem celé cesty:
 - Anglická klávesnice: Pod klávesou Esc
 
 ### macOS
-- Česká klávesnice: Pod klávesou Esc
-- Anglická klávesnice: Pod klávesou Esc
+- Česká/Anglická klávesnice: Pod klávesou Esc
+- Alternativně: `Shift + klávesa vedle Enter/Return`
 
 Pro více řádků použijte trojité backticks:
 ````

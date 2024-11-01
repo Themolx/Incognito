@@ -1,4 +1,4 @@
-# Zpětné lomítko v Discord zprávách
+# Formátování cest v Discord zprávách
 
 ## Problém
 Discord automaticky odstraňuje zpětné lomítko (`\`) pokud je umístěno před podtržítkem (`_`). Toto chování způsobuje problémy při sdílení cest k souborům v týmové komunikaci.
@@ -14,15 +14,15 @@ Použijte zpětné apostrofy (backticks) kolem celé cesty:
 `P:\EPET3D_02413\sources\_client_to\240828_previews`
 ```
 
-## Jak napsat backtick (`)
+## Kde najít backtick (`)
 
-### Backtick na různých klávesnicích
-- **Česká klávesnice**: Zpětný apostrof je pod klávesou Esc
-- **Anglická klávesnice**: Pod klávesou Esc (vlevo nahoře)
+### Windows
+- Česká klávesnice: Pod klávesou Esc
+- Anglická klávesnice: Pod klávesou Esc
 
-### Zpětné lomítko (\)
-- **Česká klávesnice**: `Shift + klávesa vlevo od Enter`
-- **Anglická klávesnice**: Klávesa vlevo od Enter
+### macOS
+- Česká klávesnice: Pod klávesou Esc
+- Anglická klávesnice: Pod klávesou Esc
 
 Pro více řádků použijte trojité backticks:
 ````

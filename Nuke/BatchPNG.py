@@ -25,8 +25,11 @@ def create_png_writes():
         import re
         name_clean = re.sub(r'\.?%\d*d|\.?\#+', '', name_without_ext)
         
+        # Create png subfolder path and maintain Windows separators
+        png_directory = directory + '/png'
+        
         # Construct new path with frame pattern at the end
-        new_path = os.path.join(directory, name_clean + '_png_sRGB.%04d.png')
+        new_path = png_directory + '/' + name_clean + '_png_sRGB.%04d.png'
         
         # Configure write node settings
         write_node['file'].setValue(new_path)

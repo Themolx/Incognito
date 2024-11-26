@@ -89,7 +89,7 @@
         }
     }
 
-    // Helper function to pad numbers with leading zeros (replacement for padStart)
+    // Helper function to pad numbers with leading zeros
     function padZero(num) {
         return num < 10 ? "0" + num : num.toString();
     }
@@ -118,7 +118,7 @@
             var markerTime = comp.markerProperty.keyTime(i);
             markers.push({
                 time: markerTime,
-                frame: Math.round(markerTime * comp.frameRate)
+                frame: Math.round(markerTime * comp.frameRate) + 1001  // Add 1001 to frame number
             });
         }
 
@@ -147,13 +147,14 @@
                 var exportData = {
                     compositionName: comp.name,
                     frameRate: comp.frameRate,
+                    frameStart: 1001,  // Add frame start information
                     markers: []
                 };
 
                 for (var i = 0; i < markers.length; i++) {
                     var marker = comp.markerProperty.keyValue(i + 1);
                     var shotNumber = startingShot + (i * increment);
-                    var markerFrame = markers[i].frame;
+                    var markerFrame = markers[i].frame;  // This now includes the 1001 offset
                     
                     // Update marker in composition
                     marker.comment = "Shot_" + shotNumber + " (Frame: " + markerFrame + ")";

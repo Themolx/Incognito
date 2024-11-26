@@ -1,12 +1,35 @@
+# NukeMolochLoader_v1.1
+#
+# This script creates a Moloch Frame Selector tool for Nuke that allows users to:
+# 1. Select a Read node
+# 2. Load a JSON file containing shot/frame data from Moloch timeline markers
+# 3. Select a shot from loaded data
+# 4. Apply frame number to the Read node's first frame
+#
+# Usage:
+# 1. Place script in ~/.nuke directory
+# 2. Add to menu.py:
+# import NukeMolochLoader
+# toolbar = nuke.toolbar('Nodes')
+# toolbar.addCommand('Tools/Moloch Loader', 'NukeMolochLoader.show_dialog()')
+
 import json
 import nuke
+import os
 from PySide2.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, 
                              QPushButton, QLabel, QComboBox, 
                              QFileDialog, QMessageBox)
 
-class ShotFrameSelector(QDialog):
+# User variables
+WINDOW_TITLE = "Moloch Frame Selector"
+WINDOW_MIN_WIDTH = 400
+MOLOCH_MARKERS_PATH = r"Y:\MOLOCH_02426\assets\assets2D\Inserts_EP01\InsertTimelineMarkers"
+BACKGROUND_COLOR = "#2f2f2f"
+PADDING = "10px"
+
+class MolochLoader(QDialog):
     def __init__(self, parent=None):
-        super(ShotFrameSelector, self).__init__(parent)
+        super(MolochLoader, self).__init__(parent)
         self.shots_data = None
         self.read_node = self.getSelectedReadNode()
         self.setupUI()
@@ -21,8 +44,8 @@ class ShotFrameSelector(QDialog):
         
     def setupUI(self):
         """Setup the UI elements"""
-        self.setWindowTitle("Shot Frame Selector")
-        self.setMinimumWidth(400)
+        self.setWindowTitle(WINDOW_TITLE)
+        self.setMinimumWidth(WINDOW_MIN_WIDTH)
         
         # Create main layout
         main_layout = QVBoxLayout()
@@ -36,7 +59,7 @@ class ShotFrameSelector(QDialog):
         json_layout = QHBoxLayout()
         self.path_label = QLabel("No JSON loaded")
         self.path_label.setWordWrap(True)
-        load_btn = QPushButton("Load JSON")
+        load_btn = QPushButton("Load Moloch JSON")
         load_btn.clicked.connect(self.loadJSON)
         json_layout.addWidget(self.path_label)
         json_layout.addWidget(load_btn)
@@ -53,7 +76,7 @@ class ShotFrameSelector(QDialog):
         
         # Info display
         self.info_label = QLabel("")
-        self.info_label.setStyleSheet("QLabel { background-color: #2f2f2f; padding: 10px; }")
+        self.info_label.setStyleSheet(f"QLabel {{ background-color: {BACKGROUND_COLOR}; padding: {PADDING}; }}")
         main_layout.addWidget(self.info_label)
         
         # Apply button
@@ -67,10 +90,14 @@ class ShotFrameSelector(QDialog):
     def loadJSON(self):
         """Load the JSON file containing shot data"""
         try:
+            # Create the directory if it doesn't exist
+            if not os.path.exists(MOLOCH_MARKERS_PATH):
+                os.makedirs(MOLOCH_MARKERS_PATH)
+                
             file_path, _ = QFileDialog.getOpenFileName(
                 self,
-                "Select JSON file",
-                "",
+                "Select Moloch JSON file",
+                MOLOCH_MARKERS_PATH,  # Start in the Moloch markers directory
                 "JSON Files (*.json)"
             )
             
@@ -80,7 +107,7 @@ class ShotFrameSelector(QDialog):
             with open(file_path, 'r') as f:
                 self.shots_data = json.load(f)
             
-            self.path_label.setText(f"Loaded: {file_path}")
+            self.path_label.setText(f"Loaded: {os.path.basename(file_path)}")
             self.populateShots()
             
         except Exception as e:
@@ -99,7 +126,6 @@ class ShotFrameSelector(QDialog):
         self.shot_combo.setEnabled(True)
         self.apply_btn.setEnabled(True)
         
-        # Add shots to combo box
         for marker in self.shots_data['markers']:
             self.shot_combo.addItem(
                 f"Shot_{marker['shotNumber']} (Frame {marker['frame']})",
@@ -121,7 +147,7 @@ class ShotFrameSelector(QDialog):
         self.info_label.setText(info_text)
     
     def applyFrame(self):
-        """Apply the selected frame to the Read node's 'first' frame"""
+        """Apply the selected frame to the Read node's first frame"""
         if not self.read_node:
             QMessageBox.warning(self, "Warning", "Please select a Read node first!")
             return
@@ -130,13 +156,8 @@ class ShotFrameSelector(QDialog):
             marker = self.shot_combo.currentData()
             frame = marker['frame']
             
-            # Begin undo group
-            nuke.Undo().begin("Set Read Node First Frame")
-            
-            # Only set the 'first' frame value
-            self.read_node['first'].setValue(frame)
-            
-            nuke.Undo().end()
+            with nuke.Undo():
+                self.read_node['first'].setValue(frame)
             
             QMessageBox.information(
                 self,
@@ -145,13 +166,13 @@ class ShotFrameSelector(QDialog):
             )
             
         except Exception as e:
-            nuke.Undo().cancel()
             QMessageBox.critical(
                 self,
                 "Error",
                 f"Failed to set frame: {str(e)}"
             )
 
-# Direct execution
-dialog = ShotFrameSelector()
-dialog.exec_()
+def show_dialog():
+    """Show the Moloch Loader dialog"""
+    dialog = MolochLoader()
+    dialog.exec_()

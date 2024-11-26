@@ -140,8 +140,11 @@
         var ui = createDialog();
         
         ui.okButton.onClick = function() {
-            var startingShot = parseInt(ui.shotInput.text);
-            var increment = parseInt(ui.incrementInput.text);
+            // Store the original input value as a string
+            var startingShotStr = ui.shotInput.text;
+            // Convert to number only for calculations
+            var startingShot = Number(startingShotStr);
+            var increment = parseInt(ui.incrementInput.text) || 0;
 
             if (isNaN(startingShot) || isNaN(increment)) {
                 alert("Please enter valid numbers!");
@@ -162,20 +165,21 @@
 
                 for (var i = 0; i < markers.length; i++) {
                     var marker = comp.markerProperty.keyValue(i + 1);
-                    var shotNumber = startingShot + (i * increment);
-                    var markerFrame = markers[i].frame;  // This now includes the 1001 offset
+                    // Use the exact starting number for the first marker
+                    var currentShot = (i === 0) ? startingShotStr : preserveLeadingZeros(startingShot + (i * increment));
+                    var markerFrame = markers[i].frame;
                     
                     // Update marker in composition
-                    marker.comment = "Shot_" + shotNumber + " (Frame: " + markerFrame + ")";
+                    marker.comment = "Shot_" + currentShot + " (Frame: " + markerFrame + ")";
                     comp.markerProperty.setValueAtKey(i + 1, marker);
 
                     // Add to export data
                     exportData.markers.push({
-                        shotNumber: shotNumber,
+                        shotNumber: currentShot,
                         frame: markerFrame,
                         seconds: markers[i].time,
                         timecode: timeToTimecode(markers[i].time, comp.frameRate),
-                        name: "Shot_" + shotNumber
+                        name: "Shot_" + currentShot
                     });
                 }
 
@@ -197,6 +201,14 @@
         };
 
         ui.dialog.show();
+    }
+
+    function preserveLeadingZeros(num) {
+        var str = num.toString();
+        while (str.length < 3) {
+            str = '0' + str;
+        }
+        return str;
     }
 
     main();

@@ -9,6 +9,9 @@
         return comp;
     }
 
+    // Default export path
+    var DEFAULT_EXPORT_PATH = "Y:\\MOLOCH_02426\\assets\\assets2D\\Inserts_EP01\\InsertTimelineMarkers\\marker_data.json";
+
     // Create UI Dialog
     function createDialog() {
         var dialog = new Window("dialog", "Marker Renaming and Export");
@@ -30,8 +33,8 @@
         // Export path group
         var exportGroup = dialog.add("group");
         exportGroup.add("statictext", undefined, "Export Path:");
-        var exportPath = exportGroup.add("edittext", undefined, "~/Desktop/marker_data.json");
-        exportPath.characters = 30;
+        var exportPath = exportGroup.add("edittext", undefined, DEFAULT_EXPORT_PATH);
+        exportPath.characters = 50;  // Increased to accommodate longer path
         var browseButton = exportGroup.add("button", undefined, "Browse...");
 
         // Buttons
@@ -60,6 +63,12 @@
     // Function to safely write JSON file
     function writeJSONFile(data, filePath) {
         try {
+            // Create folder if it doesn't exist
+            var folder = new Folder(filePath.substring(0, filePath.lastIndexOf("\\")));
+            if (!folder.exists) {
+                folder.create();
+            }
+
             // Create file object
             var file = new File(filePath);
             

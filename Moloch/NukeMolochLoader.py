@@ -133,12 +133,8 @@ class ShotFrameSelector(QDialog):
             # Begin undo group
             nuke.Undo().begin("Set Read Node First Frame")
             
-            # Set the first frame
+            # Only set the 'first' frame value
             self.read_node['first'].setValue(frame)
-            
-            # Update original range if needed
-            if 'origfirst' in self.read_node.knobs():
-                self.read_node['origfirst'].setValue(frame)
             
             nuke.Undo().end()
             

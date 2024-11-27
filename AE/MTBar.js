@@ -8,11 +8,24 @@
         var DEFAULT_SCRIPTS_PATH = "/Users/martintomek/Downloads/Incognito-main/AE";
         alert("MTBar starting...\nLooking for scripts in: " + DEFAULT_SCRIPTS_PATH);
         
-        var win = (thisObj instanceof Panel) ? thisObj : new Window("palette", "MTBar", undefined, {resizeable: true});
+        var win = (thisObj instanceof Panel) ? thisObj : new Window("palette", "MTBar", undefined, {resizeable: true, closeButton: true});
         win.orientation = "column";
         win.alignChildren = ["fill", "top"];
         win.spacing = 4;
         win.margins = 16;
+
+        // Header with refresh button
+        var headerGroup = win.add("group");
+        headerGroup.orientation = "row";
+        headerGroup.alignChildren = ["left", "center"];
+        headerGroup.spacing = 10;
+        
+        var titleText = headerGroup.add("statictext", undefined, "MTBar");
+        titleText.graphics.font = ScriptUI.newFont("Arial", "BOLD", 14);
+        
+        var refreshBtn = headerGroup.add("button", undefined, "Refresh");
+        refreshBtn.helpTip = "Refresh script list";
+        refreshBtn.preferredSize.width = 70;
 
         // Styles
         var btnStyle = {
@@ -127,6 +140,16 @@
             
             win.layout.layout(true);
         }
+
+        // Add refresh button handler
+        refreshBtn.onClick = function() {
+            refreshScriptButtons();
+        };
+
+        // Make panel resizable
+        win.onResizing = win.onResize = function() {
+            this.layout.resize();
+        };
 
         // Show the window
         if (win instanceof Window) {

@@ -3,7 +3,7 @@
 #
 # This script:
 # 1. Takes all selected Read nodes
-# 2. Creates Write nodes with MXF output settings
+# 2. Creates Write nodes with EXR output settings
 # 3. Adds text burn-in with frame number and shot name
 #
 # Usage: Select multiple Read nodes and run the script
@@ -92,8 +92,8 @@ def create_dailies_write():
             # Create shot subfolder
             shot_path = os.path.join(base_path, client_shot).replace('\\', '/')
             
-            # Create new filename (without %04d)
-            new_filename = f"{client_shot}.mxf"
+            # Create new filename with frame padding
+            new_filename = f"{client_shot}.%04d.exr"
             
             # Combine for final path
             final_path = os.path.join(shot_path, new_filename).replace('\\', '/')
@@ -107,10 +107,10 @@ def create_dailies_write():
             
             # Set the Write node parameters
             write_node['file'].setValue(final_path)
-            write_node['file_type'].setValue('mxf')
-            write_node['colorspace'].setValue('Output - Rec.709')
-            write_node['mxf_op_pattern_knob'].setValue('OP-Atom')
-            write_node['mxf_codec_profile_knob'].setValue('HQ 4:2:2 8-bit')
+            write_node['file_type'].setValue('exr')
+            write_node['colorspace'].setValue('compositing_linear')
+            write_node['metadata'].setValue('all metadata')
+            write_node['first_part'].setValue('rgba')
             write_node['create_directories'].setValue(True)
             write_node['checkHashOnRead'].setValue(False)
             

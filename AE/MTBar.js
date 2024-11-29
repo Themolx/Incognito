@@ -2,12 +2,12 @@
 // Script panel for running After Effects scripts
 // Written by Martin Tomek
 
+// User configurable path
+var USER_SCRIPTS_PATH = "/Users/martintomek/Downloads/Incognito-main/AE"; // Change this path to your desired location
+
 (function(thisObj) {
     // Build UI
     function buildUI(thisObj) {
-        var DEFAULT_SCRIPTS_PATH = "/Users/martintomek/Downloads/Incognito-main/AE";
-        alert("MTBar starting...\nLooking for scripts in: " + DEFAULT_SCRIPTS_PATH);
-        
         var win = (thisObj instanceof Panel) ? thisObj : new Window("palette", "MTBar", undefined, {resizeable: true, closeButton: true});
         win.orientation = "column";
         win.alignChildren = ["fill", "top"];
@@ -53,7 +53,7 @@
 
         // Store references
         var scriptButtons = [];
-        var currentFolder = DEFAULT_SCRIPTS_PATH;
+        var currentFolder = USER_SCRIPTS_PATH;
 
         // Helper function to check file extension
         function hasScriptExtension(filename) {
@@ -73,10 +73,10 @@
 
             if (currentFolder) {
                 var folder = new Folder(currentFolder);
-                alert("Checking folder: " + folder.fsName + "\nExists: " + folder.exists);
                 
                 if (!folder.exists) {
-                    alert("Scripts folder does not exist: " + currentFolder);
+                    var noFolderLabel = listGroup.add("statictext", undefined, "Scripts folder not found: " + currentFolder);
+                    scriptButtons.push(noFolderLabel);
                     return;
                 }
 
@@ -85,28 +85,12 @@
                     return file instanceof File && hasScriptExtension(file.name);
                 });
                 
-                alert("Found " + files.length + " script files");
-                
                 // Sort files alphabetically
                 files.sort(function(a, b) {
                     return a.displayName.toLowerCase() < b.displayName.toLowerCase() ? -1 : 1;
                 });
                 
-                // Add test button first
-                var testBtn = listGroup.add("button", undefined, "Run Test Script");
-                testBtn.onClick = function() {
-                    alert("Button clicked!");
-                    try {
-                        var testScript = new File(currentFolder + "/test.jsx");
-                        alert("Test script exists: " + testScript.exists);
-                        $.evalFile(testScript);
-                    } catch (e) {
-                        alert("Error running test script: " + e.toString());
-                    }
-                };
-                scriptButtons.push(testBtn);
-                
-                // Add other script buttons
+                // Add script buttons
                 for (var i = 0; i < files.length; i++) {
                     var file = files[i];
                     // Skip this script
@@ -121,7 +105,6 @@
                     }
                     
                     btn.onClick = function() {
-                        alert("Running script: " + this.file.fsName);
                         try {
                             $.evalFile(this.file);
                         } catch (e) {
@@ -132,7 +115,7 @@
                     scriptButtons.push(btn);
                 }
 
-                if (scriptButtons.length <= 1) { // Only test button
+                if (scriptButtons.length === 0) {
                     var noScriptsLabel = listGroup.add("statictext", undefined, "No .js/.jsx files found");
                     scriptButtons.push(noScriptsLabel);
                 }

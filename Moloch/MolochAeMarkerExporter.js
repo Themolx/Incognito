@@ -9,20 +9,20 @@
         return comp;
     }
 
-    // Default export path
+    // Default export path matching Nuke's expected path
     var DEFAULT_EXPORT_PATH = "Y:\\MOLOCH_02426\\assets\\assets2D\\Inserts_EP01\\InsertTimelineMarkers\\marker_data.json";
 
     // Create UI Dialog
     function createDialog() {
-        var dialog = new Window("dialog", "Marker Export and Renaming Tool");
+        var dialog = new Window("dialog", "Moloch Frame Selector");
         dialog.orientation = "column";
         dialog.alignChildren = "fill";
-
+        
         // Mode selection group
         var modeGroup = dialog.add("group");
         modeGroup.orientation = "row";
         modeGroup.alignChildren = "center";
-        var enableRenaming = modeGroup.add("checkbox", undefined, "Enable Marker Renaming");
+        var enableRenaming = modeGroup.add("checkbox", undefined, "Enable Shot Renaming");
         enableRenaming.value = false; // Default to false
 
         // Shot settings panel - initially hidden
@@ -92,7 +92,7 @@
         };
     }
 
-    // Other helper functions remain the same
+    // Helper functions
     function parseSpecialShots(specialShotsText) {
         if (!specialShotsText || !specialShotsText.trim()) return [];
         
@@ -205,9 +205,10 @@
         var markers = [];
         for (var i = 1; i <= comp.markerProperty.numKeys; i++) {
             var markerTime = comp.markerProperty.keyTime(i);
+            var markerFrame = Math.round(markerTime * comp.frameRate) + 1001; // Adding 1001 offset for Nuke compatibility
             markers.push({
                 time: markerTime,
-                frame: Math.round(markerTime * comp.frameRate) + 1001
+                frame: markerFrame
             });
         }
 
@@ -226,7 +227,6 @@
                 var exportData = {
                     compositionName: comp.name,
                     frameRate: comp.frameRate,
-                    frameStart: 1001,
                     markers: []
                 };
 
@@ -264,13 +264,15 @@
                     // Export-only mode (no renaming)
                     for (var i = 0; i < markers.length; i++) {
                         var marker = comp.markerProperty.keyValue(i + 1);
-                        var markerFrame = markers[i].frame;
+                        var originalName = marker.comment || ("Marker_" + (i + 1));
+                        var shotNumber = originalName.match(/Shot_(\d+)/);
                         
                         exportData.markers.push({
-                            originalName: marker.comment || ("Marker_" + (i + 1)),
-                            frame: markerFrame,
+                            shotNumber: shotNumber ? shotNumber[1] : (i + 1).toString(),
+                            frame: markers[i].frame,
                             seconds: markers[i].time,
-                            timecode: timeToTimecode(markers[i].time, comp.frameRate)
+                            timecode: timeToTimecode(markers[i].time, comp.frameRate),
+                            name: originalName
                         });
                     }
                 }

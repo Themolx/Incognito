@@ -4,7 +4,7 @@
 # 1. Select a Read node
 # 2. Load a JSON file containing shot/frame data from Moloch timeline markers
 # 3. Select a shot from loaded data
-# 4. Apply frame number to the Read node's first frame
+# 4. Create a Retime node with input range from JSON and output range starting at 1001
 #
 # Usage:
 # 1. Place script in ~/.nuke directory
@@ -18,7 +18,7 @@ import nuke
 import os
 from PySide2.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, 
                              QPushButton, QLabel, QComboBox, 
-                             QFileDialog, QMessageBox)
+                             QFileDialog, QMessageBox, QCheckBox)
 
 # User variables
 WINDOW_TITLE = "Moloch Frame Selector"
@@ -74,13 +74,18 @@ class MolochLoader(QDialog):
         shot_layout.addWidget(self.shot_combo)
         main_layout.addLayout(shot_layout)
         
+        # Frame range info
+        range_info = QLabel("Input range will be set to JSON frame\nOutput range will start at 1001")
+        range_info.setStyleSheet(f"QLabel {{ background-color: {BACKGROUND_COLOR}; padding: {PADDING}; }}")
+        main_layout.addWidget(range_info)
+        
         # Info display
         self.info_label = QLabel("")
         self.info_label.setStyleSheet(f"QLabel {{ background-color: {BACKGROUND_COLOR}; padding: {PADDING}; }}")
         main_layout.addWidget(self.info_label)
         
         # Apply button
-        self.apply_btn = QPushButton("Apply Frame to Read Node")
+        self.apply_btn = QPushButton("Create Retime Node")
         self.apply_btn.setEnabled(False)
         self.apply_btn.clicked.connect(self.applyFrame)
         main_layout.addWidget(self.apply_btn)
@@ -147,32 +152,56 @@ class MolochLoader(QDialog):
         self.info_label.setText(info_text)
     
     def applyFrame(self):
-        """Apply the selected frame to the Read node's first frame"""
+        """Create a Retime node with input range from JSON and output range starting at 1001"""
         if not self.read_node:
             QMessageBox.warning(self, "Warning", "Please select a Read node first!")
             return
             
         try:
             marker = self.shot_combo.currentData()
-            frame = marker['frame']
+            input_first = int(marker['frame'])  # Convert to int since we know it's already a number
+            frame_count = 115  # This will make the range span 115 frames (1116 - 1001 = 115)
+            shot_name = f"Shot_{marker['shotNumber']}"
             
-            with nuke.Undo():
-                self.read_node['first'].setValue(frame)
+            # Create the TCL command for the Retime node
+            tcl_cmd = f'''
+            set cut_paste_input [stack 0]
+            version 14.0 v5
+            push $cut_paste_input
+            Retime {{
+                input.first {input_first}
+                input.first_lock true
+                input.last {input_first + frame_count}
+                output.first 1001
+                output.first_lock true
+                output.last {1001 + frame_count}
+                before continue
+                after continue
+                time ""
+                name "Retime_{shot_name}"
+                selected true
+            }}
+            '''
+            
+            # Execute the TCL command
+            nuke.tcl(tcl_cmd)
             
             QMessageBox.information(
                 self,
                 "Success",
-                f"Set first frame to {frame} for node: {self.read_node.name()}"
+                f"Created Retime_{shot_name} node with input range {input_first}-{input_first + frame_count} "
+                f"and output range 1001-{1001 + frame_count}"
             )
             
         except Exception as e:
             QMessageBox.critical(
                 self,
                 "Error",
-                f"Failed to set frame: {str(e)}"
+                f"Failed to create Retime node: {str(e)}"
             )
 
 def show_dialog():
     """Show the Moloch Loader dialog"""
     dialog = MolochLoader()
     dialog.exec_()
+show_dialog()

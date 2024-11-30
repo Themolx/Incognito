@@ -248,8 +248,8 @@
                         var currentShot = preserveLeadingZeros(shotSequence[i]);
                         var markerFrame = markers[i].frame;
                         
-                        // Update marker in composition
-                        marker.comment = "Shot_" + currentShot + " (Frame: " + markerFrame + ")";
+                        // Update marker in composition - now using raw number
+                        marker.comment = currentShot + " (Frame: " + markerFrame + ")";
                         comp.markerProperty.setValueAtKey(i + 1, marker);
 
                         exportData.markers.push({
@@ -257,7 +257,7 @@
                             frame: markerFrame,
                             seconds: markers[i].time,
                             timecode: timeToTimecode(markers[i].time, comp.frameRate),
-                            name: "Shot_" + currentShot
+                            name: currentShot
                         });
                     }
                 } else {
@@ -265,14 +265,14 @@
                     for (var i = 0; i < markers.length; i++) {
                         var marker = comp.markerProperty.keyValue(i + 1);
                         var originalName = marker.comment || ("Marker_" + (i + 1));
-                        var shotNumber = originalName.match(/Shot_(\d+)/);
+                        var shotNumber = originalName.match(/(\d+)/); // Modified to match just numbers
                         
                         exportData.markers.push({
                             shotNumber: shotNumber ? shotNumber[1] : (i + 1).toString(),
                             frame: markers[i].frame,
                             seconds: markers[i].time,
                             timecode: timeToTimecode(markers[i].time, comp.frameRate),
-                            name: originalName
+                            name: shotNumber ? shotNumber[1] : (i + 1).toString() // Using raw number
                         });
                     }
                 }

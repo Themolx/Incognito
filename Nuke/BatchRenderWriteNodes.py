@@ -1,73 +1,131 @@
-# BatchRenderWriteNodes.py v1.1
+# BatchRenderWriteNodes.py v1.3
 #
-# This script renders selected Write nodes with custom frame ranges.
-# Usage: Select Write nodes in Nuke's node graph, run the script,
-# and input custom frame ranges for each Write node.
+# This script renders selected Write nodes and shows progress in a single window.
+# Usage: Select Write nodes in Nuke's node graph, run the script.
+# Click 'Go' to start rendering after reviewing the nodes to be rendered.
 #
 # Features:
-# - Renders multiple Write nodes
-# - Custom frame range per Write node
-# - Integer-only frame validation
-# - Progress feedback
+# - Single window interface
+# - Shows all Write nodes to be rendered
+# - Progress updates in real-time
+# - Go button to start rendering
 # - Error handling
 #
 # Author: Claude
 # Last Updated: 2024-11-29
 
 import nuke
+from PySide2 import QtWidgets, QtCore
 import re
 
 # User Variables 
-FRAME_PATTERN = r'^\d+\-\d+$'  # Pattern for frame range validation (e.g., 1001-1100)
-DEFAULT_FRAME_RANGE = "1001-1100"  # Default frame range suggestion
-ERROR_COLOR = 0xFF0000FF  # Red color for error highlighting
+WINDOW_WIDTH = 400
+WINDOW_HEIGHT = 300
+WINDOW_TITLE = "Batch Render Progress"
 
-def validate_frame_range(frame_range):
-    """Validate frame range string format and ensure integer values."""
-    try:
-        # Check format
-        if not re.match(FRAME_PATTERN, frame_range):
-            return False, "Invalid format. Use: startFrame-endFrame (integers only)"
+class RenderWindow(QtWidgets.QDialog):
+    def __init__(self, write_nodes):
+        super().__init__()
         
-        # Parse values and ensure they're integers
-        start_str, end_str = frame_range.split('-')
+        self.write_nodes = write_nodes
+        self.completed_renders = 0
         
-        # Convert to integers and check for float values
-        if '.' in start_str or '.' in end_str:
-            return False, "Frame numbers must be integers, not decimal numbers"
+        self.setup_ui()
+        
+    def setup_ui(self):
+        """Setup the user interface"""
+        # Window setup
+        self.setWindowTitle(WINDOW_TITLE)
+        self.setMinimumSize(WINDOW_WIDTH, WINDOW_HEIGHT)
+        self.setWindowFlags(QtCore.Qt.Window | QtCore.Qt.WindowStaysOnTopHint)
+        
+        # Main layout
+        layout = QtWidgets.QVBoxLayout()
+        
+        # Info header
+        self.header_label = QtWidgets.QLabel(f"Found {len(self.write_nodes)} Write nodes to render:")
+        layout.addWidget(self.header_label)
+        
+        # Create text area for nodes
+        self.info_text = QtWidgets.QTextEdit()
+        self.info_text.setReadOnly(True)
+        
+        # Populate node information
+        node_info = ""
+        for node in self.write_nodes:
+            start = int(node['first'].value())
+            end = int(node['last'].value())
+            node_info += f"Node: {node.name()}\n"
+            node_info += f"Frame Range: {start}-{end}\n"
+            node_info += "-" * 40 + "\n"
+        
+        self.info_text.setText(node_info)
+        layout.addWidget(self.info_text)
+        
+        # Progress section
+        self.progress_label = QtWidgets.QLabel("Ready to render...")
+        layout.addWidget(self.progress_label)
+        
+        self.progress_bar = QtWidgets.QProgressBar()
+        self.progress_bar.setMaximum(len(self.write_nodes))
+        self.progress_bar.setValue(0)
+        layout.addWidget(self.progress_bar)
+        
+        # Current render label
+        self.current_render_label = QtWidgets.QLabel("Waiting to start...")
+        layout.addWidget(self.current_render_label)
+        
+        # Go button
+        self.go_button = QtWidgets.QPushButton("Go")
+        self.go_button.clicked.connect(self.start_render)
+        layout.addWidget(self.go_button)
+        
+        self.setLayout(layout)
+        
+    def update_progress(self, node_name):
+        """Update progress display"""
+        self.completed_renders += 1
+        self.progress_bar.setValue(self.completed_renders)
+        self.progress_label.setText(f"Completed: {self.completed_renders}/{len(self.write_nodes)} renders")
+        self.current_render_label.setText(f"Current: {node_name}")
+        
+        # Process events to show updates
+        QtWidgets.QApplication.processEvents()
+        
+    def start_render(self):
+        """Start the rendering process"""
+        self.go_button.setEnabled(False)
+        self.go_button.setText("Rendering...")
+        
+        try:
+            # Store original ranges
+            original_ranges = {}
             
-        start = int(start_str)
-        end = int(end_str)
-        
-        # Validate values
-        if start > end:
-            return False, "Start frame must be less than or equal to end frame"
+            for node in self.write_nodes:
+                try:
+                    # Store original range
+                    original_ranges[node] = (int(node['first'].value()), int(node['last'].value()))
+                    
+                    # Execute render
+                    start = int(node['first'].value())
+                    end = int(node['last'].value())
+                    print(f"Rendering {node.name()} frames {start}-{end}")
+                    
+                    self.current_render_label.setText(f"Rendering: {node.name()}")
+                    nuke.execute(node, start, end)
+                    self.update_progress(node.name())
+                    
+                except Exception as e:
+                    nuke.message(f"Error rendering {node.name()}: {str(e)}")
+                    
+        finally:
+            # Restore original ranges
+            for node, (start, end) in original_ranges.items():
+                node['first'].setValue(start)
+                node['last'].setValue(end)
             
-        return True, (start, end)
-    except ValueError:
-        return False, "Invalid frame numbers"
-
-def get_frame_range_for_node(node):
-    """Get frame range from user for a specific Write node."""
-    while True:
-        # Get current frame range from node if exists, ensure integers
-        current_start = int(node['first'].value())
-        current_end = int(node['last'].value())
-        current_range = f"{current_start}-{current_end}"
-        
-        # Prompt user
-        msg = f'Enter frame range for {node.name()}\n(format: startFrame-endFrame, integers only)'
-        frame_range = nuke.getInput(msg, current_range)
-        
-        if frame_range is None:  # User canceled
-            return None
-            
-        # Validate input
-        valid, result = validate_frame_range(frame_range)
-        if valid:
-            return result
-        else:
-            nuke.message(f"Error: {result}\nPlease try again.")
+            self.go_button.setText("Complete!")
+            self.current_render_label.setText("All renders completed!")
 
 def render_write_nodes():
     """Main function to handle Write node rendering."""
@@ -78,40 +136,10 @@ def render_write_nodes():
     if not write_nodes:
         nuke.message("Please select at least one Write node.")
         return
-        
-    # Store original frame ranges to restore later
-    original_ranges = {}
     
-    try:
-        # Get frame ranges for each node
-        render_queue = []
-        for node in write_nodes:
-            frame_range = get_frame_range_for_node(node)
-            if frame_range is None:  # User canceled
-                return
-                
-            # Store original range as integers
-            original_ranges[node] = (int(node['first'].value()), int(node['last'].value()))
-            
-            # Set new range
-            start, end = frame_range
-            node['first'].setValue(start)
-            node['last'].setValue(end)
-            render_queue.append((node, start, end))
-        
-        # Render each node
-        for node, start, end in render_queue:
-            try:
-                print(f"Rendering {node.name()} frames {start}-{end}")
-                nuke.execute(node, start, end)
-            except Exception as e:
-                nuke.message(f"Error rendering {node.name()}: {str(e)}")
-                
-    finally:
-        # Restore original frame ranges
-        for node, (start, end) in original_ranges.items():
-            node['first'].setValue(start)
-            node['last'].setValue(end)
+    # Create and show window
+    render_window = RenderWindow(write_nodes)
+    render_window.exec_()
 
 if __name__ == "__main__":
     render_write_nodes()

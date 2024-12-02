@@ -1,167 +1,192 @@
-// MTBar.jsx
-// Script panel for running After Effects scripts
-// Written by Martin Tomek
+/*
+Auto-versioning Render Queue Setup Script v1.1
+This script:
+1. Finds project folder path based on project token pattern
+2. Locates dailies folder in project structure
+3. Creates date-based folder for outputs
+4. Auto-versions files if matching names exist
+5. Sets up render queue with proper output paths
 
-// User configurable path
-var USER_SCRIPTS_PATH = "P:/2D_TESTY_0000/AE_SCRIPTS/ButtonScripts"; // Change this path to your desired location
+Usage:
+1. Select compositions to render
+2. Run script
+3. Files will be auto-versioned if duplicates exist
+*/
 
-(function(thisObj) {
-    // Build UI
-    function buildUI(thisObj) {
-        var win = (thisObj instanceof Panel) ? thisObj : new Window("palette", "MTBar", undefined, {resizeable: true, closeButton: true});
-        win.orientation = "column";
-        win.alignChildren = ["fill", "top"];
-        win.spacing = 4;
-        win.margins = 16;
+{
+    app.beginUndoGroup("Process Project Path and Setup Render Queue");
 
-        // Header with refresh button
-        var headerGroup = win.add("group");
-        headerGroup.orientation = "row";
-        headerGroup.alignChildren = ["left", "center"];
-        headerGroup.spacing = 10;
+    // User configurable variables
+    var VERSION_PREFIX = "_v"; // Version number prefix
+    var VERSION_PADDING = 2; // Number of digits for version number
+    var DEFAULT_VERSION = 1; // Starting version number
+
+    function getProjectFolderPath() {
+        var projectPath = app.project.file.path;
         
-        var titleText = headerGroup.add("statictext", undefined, "MTBar");
-        titleText.graphics.font = ScriptUI.newFont("Arial", "BOLD", 14);
+        var pathParts = projectPath.split(/[\\\/]/);
+        var projectIndex = -1;
         
-        var refreshBtn = headerGroup.add("button", undefined, "Refresh");
-        refreshBtn.helpTip = "Refresh script list";
-        refreshBtn.preferredSize.width = 70;
-
-        // Styles
-        var btnStyle = {
-            preferredSize: [200, 30],
-            fill: [0.2, 0.2, 0.2],
-            stroke: [0.8, 0.8, 0.8],
-            font: "Arial-Bold:12",
-            justify: "left",
-            margins: 10
-        };
-
-        // Scripts panel with scrollbar
-        var scriptsPanel = win.add("panel", undefined, "Scripts");
-        scriptsPanel.orientation = "column";
-        scriptsPanel.alignChildren = ["fill", "top"];
-        scriptsPanel.spacing = 4;
-        scriptsPanel.margins = 10;
-
-        // Create scrollable list
-        var listGroup = scriptsPanel.add("group");
-        listGroup.orientation = "column";
-        listGroup.alignChildren = ["fill", "top"];
-        listGroup.spacing = 4;
-        listGroup.maximumSize.height = 400; // Limit height for scrolling
-
-        // Store references
-        var scriptButtons = [];
-        var currentFolder = USER_SCRIPTS_PATH;
-
-        // Helper function to check file extension
-        function hasScriptExtension(filename) {
-            filename = filename.toLowerCase();
-            return filename.substr(-3) === '.js' || filename.substr(-4) === '.jsx';
-        }
-
-        // Function to refresh script buttons
-        function refreshScriptButtons() {
-            // Remove existing buttons
-            for (var i = 0; i < scriptButtons.length; i++) {
-                if (scriptButtons[i] && scriptButtons[i].parent) {
-                    scriptButtons[i].parent.remove(scriptButtons[i]);
-                }
+        for (var i = 0; i < pathParts.length; i++) {
+            if (pathParts[i].match(/[A-Z]+_[A-Z]+_\d+/)) {
+                projectIndex = i;
+                break;
             }
-            scriptButtons = [];
-
-            if (currentFolder) {
-                var folder = new Folder(currentFolder);
-                
-                if (!folder.exists) {
-                    var noFolderLabel = listGroup.add("statictext", undefined, "Scripts folder not found: " + currentFolder);
-                    scriptButtons.push(noFolderLabel);
-                    return;
-                }
-
-                // Get both .js and .jsx files
-                var files = folder.getFiles(function(file) {
-                    return file instanceof File && hasScriptExtension(file.name);
-                });
-                
-                // Sort files alphabetically
-                files.sort(function(a, b) {
-                    return a.displayName.toLowerCase() < b.displayName.toLowerCase() ? -1 : 1;
-                });
-                
-                // Add test button first
-                var testBtn = listGroup.add("button", undefined, "Run Test Script");
-                testBtn.onClick = function() {
-                    try {
-                        var testScript = new File(currentFolder + "/test.jsx");
-                        if (testScript.exists) {
-                            $.evalFile(testScript);
-                        } else {
-                            alert("Test script not found at: " + testScript.fsName);
-                        }
-                    } catch (e) {
-                        alert("Error running test script: " + e.toString());
-                    }
-                };
-                scriptButtons.push(testBtn);
-                
-                // Add other script buttons
-                for (var i = 0; i < files.length; i++) {
-                    var file = files[i];
-                    // Skip this script
-                    if (file.name === "MTBar.jsx") continue;
-                    
-                    var btn = listGroup.add("button", undefined, file.displayName);
-                    btn.file = file;
-                    
-                    // Apply style
-                    for (var prop in btnStyle) {
-                        btn[prop] = btnStyle[prop];
-                    }
-                    
-                    btn.onClick = function() {
-                        try {
-                            $.evalFile(this.file);
-                        } catch (e) {
-                            alert("Error running script: " + e.toString());
-                        }
-                    };
-                    
-                    scriptButtons.push(btn);
-                }
-
-                if (scriptButtons.length <= 1) { // Only test button
-                    var noScriptsLabel = listGroup.add("statictext", undefined, "No .js/.jsx files found");
-                    scriptButtons.push(noScriptsLabel);
-                }
-            }
-            
-            win.layout.layout(true);
         }
-
-        // Add refresh button handler
-        refreshBtn.onClick = function() {
-            refreshScriptButtons();
-        };
-
-        // Make panel resizable
-        win.onResizing = win.onResize = function() {
-            this.layout.resize();
-        };
-
-        // Show the window
-        if (win instanceof Window) {
-            win.center();
-            win.show();
-        } else {
-            win.layout.layout(true);
+        
+        if (projectIndex === -1) {
+            return null;
         }
-
-        // Load scripts immediately
-        refreshScriptButtons();
+        
+        var projectFolderPath = pathParts.slice(0, projectIndex + 1).join('/');
+        return projectFolderPath;
     }
 
-    buildUI(thisObj);
+    function findDailiesFolder(projectFolderPath) {
+        var outputFolder = new Folder(projectFolderPath + "/output");
+        
+        if (!outputFolder.exists) {
+            return null;
+        }
+        
+        var dailiesWithUnderscore = new Folder(outputFolder.fsName + "/_dailies");
+        var dailiesWithoutUnderscore = new Folder(outputFolder.fsName + "/dailies");
+        
+        if (dailiesWithUnderscore.exists) {
+            return dailiesWithUnderscore;
+        } else if (dailiesWithoutUnderscore.exists) {
+            return dailiesWithoutUnderscore;
+        }
+        
+        return null;
+    }
 
-})(this);
+    function createDateFolder(parentFolder) {
+        var date = new Date();
+        var dateString = date.getFullYear().toString().substr(-2) +
+                        ("0" + (date.getMonth() + 1)).slice(-2) +
+                        ("0" + date.getDate()).slice(-2);
+        
+        var newFolder = new Folder(parentFolder.fsName + "/" + dateString);
+        
+        if (!newFolder.exists) {
+            newFolder.create();
+        }
+        return newFolder;
+    }
+
+    function getNextVersionNumber(folderPath, baseName) {
+        var folder = new Folder(folderPath);
+        var files = folder.getFiles();
+        var highestVersion = 0;
+        
+        baseName = baseName.replace(/_v\d+$/, '').replace(/v\d+$/, '');
+        
+        var versionRegexWithUnderscore = new RegExp(baseName.replace(/([.?*+^$[\]\\(){}|-])/g, "\\$1") + 
+                                    VERSION_PREFIX + "\\d{" + VERSION_PADDING + "}");
+        var versionRegexNoUnderscore = new RegExp(baseName.replace(/([.?*+^$[\]\\(){}|-])/g, "\\$1") + 
+                                    "v\\d+");
+        
+        for (var i = 0; i < files.length; i++) {
+            var fileName = files[i].name;
+            if (fileName.match(versionRegexWithUnderscore)) {
+                var version = parseInt(fileName.match(new RegExp(VERSION_PREFIX + "(\\d+)"))[1]);
+                highestVersion = Math.max(highestVersion, version);
+            } else if (fileName.match(versionRegexNoUnderscore)) {
+                var version = parseInt(fileName.match(/v(\d+)/)[1]);
+                highestVersion = Math.max(highestVersion, version);
+            }
+        }
+        
+        return highestVersion + 1;
+    }
+
+    function formatVersion(version) {
+        return VERSION_PREFIX + padNumber(version, VERSION_PADDING);
+    }
+
+    function padNumber(number, width) {
+        var numString = number.toString();
+        while (numString.length < width) {
+            numString = "0" + numString;
+        }
+        return numString;
+    }
+
+    function getVersionedFileName(folderPath, originalName) {
+        var baseName = originalName;
+        var extension = "";
+        
+        var lastDotIndex = originalName.lastIndexOf(".");
+        if (lastDotIndex !== -1) {
+            baseName = originalName.substring(0, lastDotIndex);
+            extension = originalName.substring(lastDotIndex);
+        }
+        
+        baseName = baseName.replace(/_v\d+$/, '').replace(/v\d+$/, '');
+        
+        var folder = new Folder(folderPath);
+        var files = folder.getFiles();
+        var useSimpleFormat = false;
+        
+        var versionRegexNoUnderscore = new RegExp(baseName.replace(/([.?*+^$[\]\\(){}|-])/g, "\\$1") + "v\\d+");
+        for (var i = 0; i < files.length; i++) {
+            if (files[i].name.match(versionRegexNoUnderscore)) {
+                useSimpleFormat = true;
+                break;
+            }
+        }
+        
+        var version = getNextVersionNumber(folderPath, baseName);
+        
+        if (useSimpleFormat) {
+            return baseName + "v" + version + extension;
+        } else {
+            return baseName + formatVersion(version) + extension;
+        }
+    }
+
+    function setupRenderQueue(outputPath) {
+        var selectedItems = app.project.selection;
+        var comps = [];
+        
+        for (var i = 0; i < selectedItems.length; i++) {
+            if (selectedItems[i] instanceof CompItem) {
+                comps.push(selectedItems[i]);
+            }
+        }
+        
+        for (var i = 0; i < comps.length; i++) {
+            var renderQueueItem = app.project.renderQueue.items.add(comps[i]);
+            var outputModule = renderQueueItem.outputModule(1);
+            
+            var versionedName = getVersionedFileName(outputPath.fsName, comps[i].name);
+            var outputFile = new File(outputPath.fsName + "/" + versionedName);
+            
+            outputModule.file = outputFile;
+        }
+    }
+
+    function main() {
+        var projectFolderPath = getProjectFolderPath();
+        if (!projectFolderPath) {
+            return;
+        }
+        
+        var dailiesFolder = findDailiesFolder(projectFolderPath);
+        if (!dailiesFolder) {
+            return;
+        }
+        
+        var dateFolder = createDateFolder(dailiesFolder);
+        if (!dateFolder) {
+            return;
+        }
+        
+        setupRenderQueue(dateFolder);
+    }
+
+    main();
+    
+    app.endUndoGroup();
+}

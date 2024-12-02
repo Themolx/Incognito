@@ -1,11 +1,29 @@
+/*
+Auto-versioning Render Queue Setup Script v1.1
+This script:
+1. Finds project folder path based on project token pattern
+2. Locates dailies folder in project structure
+3. Creates date-based folder for outputs
+4. Auto-versions files if matching names exist
+5. Sets up render queue with proper output paths
+
+Usage:
+1. Select compositions to render
+2. Run script
+3. Files will be auto-versioned if duplicates exist
+*/
+
 {
     app.beginUndoGroup("Process Project Path and Setup Render Queue");
 
+    // User configurable variables
+    var VERSION_PREFIX = "_v"; // Version number prefix
+    var VERSION_PADDING = 2; // Number of digits for version number
+    var DEFAULT_VERSION = 1; // Starting version number
+
     function getProjectFolderPath() {
         var projectPath = app.project.file.path;
-        alert("Full project path: " + projectPath);
         
-        // Split path and look for project token (e.g., BRIT_OOH_02435)
         var pathParts = projectPath.split(/[\\\/]/);
         var projectIndex = -1;
         
@@ -17,32 +35,22 @@
         }
         
         if (projectIndex === -1) {
-            alert("ERROR: Could not find project token in path!");
             return null;
         }
         
-        // Reconstruct path up to the project folder
         var projectFolderPath = pathParts.slice(0, projectIndex + 1).join('/');
-        alert("Found project folder path: " + projectFolderPath);
         return projectFolderPath;
     }
 
     function findDailiesFolder(projectFolderPath) {
-        // First try to find output/_dailies
         var outputFolder = new Folder(projectFolderPath + "/output");
         
         if (!outputFolder.exists) {
-            alert("ERROR: Could not find output folder in: " + projectFolderPath);
             return null;
         }
         
-        // Try both variants of dailies folder
         var dailiesWithUnderscore = new Folder(outputFolder.fsName + "/_dailies");
         var dailiesWithoutUnderscore = new Folder(outputFolder.fsName + "/dailies");
-        
-        alert("Checking for dailies folders:\n" + 
-              "With underscore: " + dailiesWithUnderscore.fsName + " (exists: " + dailiesWithUnderscore.exists + ")\n" +
-              "Without underscore: " + dailiesWithoutUnderscore.fsName + " (exists: " + dailiesWithoutUnderscore.exists + ")");
         
         if (dailiesWithUnderscore.exists) {
             return dailiesWithUnderscore;
@@ -60,20 +68,87 @@
                         ("0" + date.getDate()).slice(-2);
         
         var newFolder = new Folder(parentFolder.fsName + "/" + dateString);
-        alert("Creating date folder: " + newFolder.fsName);
         
         if (!newFolder.exists) {
-            var created = newFolder.create();
-            alert("Folder creation " + (created ? "successful" : "failed"));
+            newFolder.create();
         }
         return newFolder;
+    }
+
+    function getNextVersionNumber(folderPath, baseName) {
+        var folder = new Folder(folderPath);
+        var files = folder.getFiles();
+        var highestVersion = 0;
+        
+        baseName = baseName.replace(/_v\d+$/, '').replace(/v\d+$/, '');
+        
+        var versionRegexWithUnderscore = new RegExp(baseName.replace(/([.?*+^$[\]\\(){}|-])/g, "\\$1") + 
+                                    VERSION_PREFIX + "\\d{" + VERSION_PADDING + "}");
+        var versionRegexNoUnderscore = new RegExp(baseName.replace(/([.?*+^$[\]\\(){}|-])/g, "\\$1") + 
+                                    "v\\d+");
+        
+        for (var i = 0; i < files.length; i++) {
+            var fileName = files[i].name;
+            if (fileName.match(versionRegexWithUnderscore)) {
+                var version = parseInt(fileName.match(new RegExp(VERSION_PREFIX + "(\\d+)"))[1]);
+                highestVersion = Math.max(highestVersion, version);
+            } else if (fileName.match(versionRegexNoUnderscore)) {
+                var version = parseInt(fileName.match(/v(\d+)/)[1]);
+                highestVersion = Math.max(highestVersion, version);
+            }
+        }
+        
+        return highestVersion + 1;
+    }
+
+    function formatVersion(version) {
+        return VERSION_PREFIX + padNumber(version, VERSION_PADDING);
+    }
+
+    function padNumber(number, width) {
+        var numString = number.toString();
+        while (numString.length < width) {
+            numString = "0" + numString;
+        }
+        return numString;
+    }
+
+    function getVersionedFileName(folderPath, originalName) {
+        var baseName = originalName;
+        var extension = "";
+        
+        var lastDotIndex = originalName.lastIndexOf(".");
+        if (lastDotIndex !== -1) {
+            baseName = originalName.substring(0, lastDotIndex);
+            extension = originalName.substring(lastDotIndex);
+        }
+        
+        baseName = baseName.replace(/_v\d+$/, '').replace(/v\d+$/, '');
+        
+        var folder = new Folder(folderPath);
+        var files = folder.getFiles();
+        var useSimpleFormat = false;
+        
+        var versionRegexNoUnderscore = new RegExp(baseName.replace(/([.?*+^$[\]\\(){}|-])/g, "\\$1") + "v\\d+");
+        for (var i = 0; i < files.length; i++) {
+            if (files[i].name.match(versionRegexNoUnderscore)) {
+                useSimpleFormat = true;
+                break;
+            }
+        }
+        
+        var version = getNextVersionNumber(folderPath, baseName);
+        
+        if (useSimpleFormat) {
+            return baseName + "v" + version + extension;
+        } else {
+            return baseName + formatVersion(version) + extension;
+        }
     }
 
     function setupRenderQueue(outputPath) {
         var selectedItems = app.project.selection;
         var comps = [];
-        
-        alert("Selected items: " + selectedItems.length);
         
         for (var i = 0; i < selectedItems.length; i++) {
             if (selectedItems[i] instanceof CompItem) {
@@ -81,45 +156,34 @@
             }
         }
         
-        alert("Found " + comps.length + " compositions to render");
-        
         for (var i = 0; i < comps.length; i++) {
             var renderQueueItem = app.project.renderQueue.items.add(comps[i]);
             var outputModule = renderQueueItem.outputModule(1);
-            var outputFile = new File(outputPath.fsName + "/" + comps[i].name);
             
-            alert("Setting output path for " + comps[i].name + ":\n" + outputFile.fsName);
+            var versionedName = getVersionedFileName(outputPath.fsName, comps[i].name);
+            var outputFile = new File(outputPath.fsName + "/" + versionedName);
+            
             outputModule.file = outputFile;
         }
     }
 
     function main() {
-        alert("Script starting...");
-        
-        // Get project folder path by analyzing current project path
         var projectFolderPath = getProjectFolderPath();
         if (!projectFolderPath) {
             return;
         }
         
-        // Find dailies folder within the project structure
         var dailiesFolder = findDailiesFolder(projectFolderPath);
         if (!dailiesFolder) {
-            alert("ERROR: Could not find dailies folder in project structure!");
             return;
         }
         
-        // Create date folder
         var dateFolder = createDateFolder(dailiesFolder);
         if (!dateFolder) {
-            alert("ERROR: Could not create date folder in " + dailiesFolder.fsName);
             return;
         }
         
-        // Setup render queue
         setupRenderQueue(dateFolder);
-        
-        alert("Process complete!\nOutput path: " + dateFolder.fsName);
     }
 
     main();

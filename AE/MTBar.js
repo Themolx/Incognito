@@ -3,7 +3,7 @@
 // Written by Martin Tomek
 
 // User configurable path
-var USER_SCRIPTS_PATH = "/Users/martintomek/Downloads/Incognito-main/AE"; // Change this path to your desired location
+var USER_SCRIPTS_PATH = "P:/2D_TESTY_0000/AE_SCRIPTS/ButtonScripts"; // Change this path to your desired location
 
 (function(thisObj) {
     // Build UI
@@ -90,7 +90,23 @@ var USER_SCRIPTS_PATH = "/Users/martintomek/Downloads/Incognito-main/AE"; // Cha
                     return a.displayName.toLowerCase() < b.displayName.toLowerCase() ? -1 : 1;
                 });
                 
-                // Add script buttons
+                // Add test button first
+                var testBtn = listGroup.add("button", undefined, "Run Test Script");
+                testBtn.onClick = function() {
+                    try {
+                        var testScript = new File(currentFolder + "/test.jsx");
+                        if (testScript.exists) {
+                            $.evalFile(testScript);
+                        } else {
+                            alert("Test script not found at: " + testScript.fsName);
+                        }
+                    } catch (e) {
+                        alert("Error running test script: " + e.toString());
+                    }
+                };
+                scriptButtons.push(testBtn);
+                
+                // Add other script buttons
                 for (var i = 0; i < files.length; i++) {
                     var file = files[i];
                     // Skip this script
@@ -115,7 +131,7 @@ var USER_SCRIPTS_PATH = "/Users/martintomek/Downloads/Incognito-main/AE"; // Cha
                     scriptButtons.push(btn);
                 }
 
-                if (scriptButtons.length === 0) {
+                if (scriptButtons.length <= 1) { // Only test button
                     var noScriptsLabel = listGroup.add("statictext", undefined, "No .js/.jsx files found");
                     scriptButtons.push(noScriptsLabel);
                 }

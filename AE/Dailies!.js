@@ -96,24 +96,170 @@ Usage:
         return null;
     }
 
+    function getTodayFolders(dailiesFolder) {
+        var date = new Date();
+        var dateString = date.getFullYear().toString().substr(-2) +
+                        padNumber(date.getMonth() + 1, 2) +
+                        padNumber(date.getDate(), 2);
+        var todayFolder = new Folder(dailiesFolder.fsName + "\\" + dateString);
+        var folders = [];
+        
+        if (todayFolder.exists) {
+            var items = todayFolder.getFiles();
+            for (var i = 0; i < items.length; i++) {
+                if (items[i] instanceof Folder) {
+                    folders.push(items[i].name);
+                }
+            }
+        }
+        
+        return folders;
+    }
+
+    function showDailiesDialog(dailiesFolder) {
+        var dialog = new Window("dialog", "Dailies Folder Setup");
+        dialog.orientation = "column";
+        dialog.alignChildren = ["center", "top"];
+        dialog.spacing = 10;
+        dialog.margins = 16;
+
+        // Add title
+        var titleGroup = dialog.add("group");
+        titleGroup.add("statictext", undefined, "Dailies Folder Setup").graphics.font = ScriptUI.newFont("Arial", "BOLD", 16);
+
+        // Add description
+        var descGroup = dialog.add("group");
+        descGroup.preferredSize.width = 300;
+        var descText = descGroup.add("statictext", undefined, "Choose how to organize your dailies output.", {multiline: true});
+        descText.alignment = ["fill", "top"];
+
+        // Radio buttons for folder type
+        var typePanel = dialog.add("panel", undefined, "Folder Type");
+        typePanel.orientation = "column";
+        typePanel.alignChildren = ["left", "top"];
+        typePanel.margins = 15;
+        var regularRadio = typePanel.add("radiobutton", undefined, "Regular (Date-based folder)");
+        var nonRegularRadio = typePanel.add("radiobutton", undefined, "Custom (Subfolder in date folder)");
+        regularRadio.value = true;
+
+        // Custom folder group
+        var customGroup = dialog.add("group");
+        customGroup.orientation = "column";
+        customGroup.alignChildren = ["left", "top"];
+        customGroup.margins = [0, 5, 0, 0];
+        
+        // Existing folders dropdown
+        var dropdownGroup = customGroup.add("group");
+        dropdownGroup.orientation = "column";
+        dropdownGroup.alignChildren = ["left", "top"];
+        var dropdownLabel = dropdownGroup.add("statictext", undefined, "Select existing folder (optional):");
+        var folderDropdown = dropdownGroup.add("dropdownlist");
+        folderDropdown.preferredSize.width = 200;
+        
+        // Get existing folders
+        var existingFolders = getTodayFolders(dailiesFolder);
+        folderDropdown.add("item", "-- Create New Folder --");
+        for (var i = 0; i < existingFolders.length; i++) {
+            folderDropdown.add("item", existingFolders[i]);
+        }
+        folderDropdown.selection = 0;
+
+        // Custom folder name input
+        var inputGroup = customGroup.add("group");
+        inputGroup.orientation = "column";
+        inputGroup.alignChildren = ["left", "top"];
+        var customLabel = inputGroup.add("statictext", undefined, "New folder name:");
+        var customInput = inputGroup.add("edittext", undefined, "");
+        customInput.preferredSize.width = 200;
+        
+        // Initially hide custom group
+        customGroup.visible = false;
+
+        // Show/hide custom input based on radio selection
+        regularRadio.onClick = function() { 
+            customGroup.visible = false; 
+        };
+        nonRegularRadio.onClick = function() { 
+            customGroup.visible = true; 
+        };
+
+        // Handle dropdown selection
+        folderDropdown.onChange = function() {
+            if (folderDropdown.selection.index === 0) {
+                // New folder selected
+                inputGroup.visible = true;
+                customInput.text = "";
+            } else {
+                // Existing folder selected
+                inputGroup.visible = false;
+                customInput.text = folderDropdown.selection.text;
+            }
+        };
+
+        // Buttons
+        var buttonGroup = dialog.add("group");
+        buttonGroup.alignment = ["center", "top"];
+        var cancelBtn = buttonGroup.add("button", undefined, "Cancel");
+        var okBtn = buttonGroup.add("button", undefined, "OK", {name: "ok"});
+
+        // Status text
+        var statusText = dialog.add("statictext", undefined, "");
+        statusText.graphics.foregroundColor = statusText.graphics.newPen(statusText.graphics.PenType.SOLID_COLOR, [1, 0, 0, 1], 1);
+
+        // Validate and handle results
+        okBtn.onClick = function() {
+            if (nonRegularRadio.value && (!customInput.text || customInput.text.toString().replace(/\s/g, '') === "")) {
+                statusText.text = "Please enter a folder name.";
+                return;
+            }
+            dialog.close(1);
+        };
+
+        cancelBtn.onClick = function() {
+            dialog.close(0);
+        };
+
+        var result = dialog.show();
+        
+        if (result === 1) {
+            return {
+                isRegular: regularRadio.value,
+                customName: customInput.text ? customInput.text.toString() : "",
+                useExistingFolder: nonRegularRadio.value && folderDropdown.selection.index > 0
+            };
+        }
+        return null;
+    }
+
     function createDateFolder(parentFolder) {
         var date = new Date();
         var dateString = date.getFullYear().toString().substr(-2) +
-                        ("0" + (date.getMonth() + 1)).slice(-2) +
-                        ("0" + date.getDate()).slice(-2);
+                        padNumber(date.getMonth() + 1, 2) +
+                        padNumber(date.getDate(), 2);
         
-        var newFolder = new Folder(parentFolder.fsName + "\\" + dateString);
-        debugLog("DATE FOLDER PATH: " + newFolder.fsName);
+        var dateFolder = new Folder(parentFolder.fsName + "\\" + dateString);
         
-        if (!newFolder.exists) {
-            var created = newFolder.create();
-            debugLog("CREATED? " + created);
-            if (!created) {
+        if (!dateFolder.exists) {
+            if (!dateFolder.create()) {
                 alert("ERROR: Failed to create date folder!");
                 return null;
             }
         }
-        return newFolder;
+        
+        return dateFolder;
+    }
+
+    function createCustomFolder(dateFolder, folderName) {
+        var customFolder = new Folder(dateFolder.fsName + "\\" + folderName);
+        
+        if (!customFolder.exists) {
+            if (!customFolder.create()) {
+                alert("ERROR: Failed to create custom folder!");
+                return null;
+            }
+        }
+        
+        return customFolder;
     }
 
     function getNextVersionNumber(folderPath, baseName) {
@@ -220,26 +366,45 @@ Usage:
     }
 
     function main() {
-        debugLog("=== STARTING ===");
+        debugLog("=== STARTING DAILIES SETUP ===");
         
         var projectFolderPath = getProjectFolderPath();
-        if (!projectFolderPath) {
-            return;
-        }
+        if (!projectFolderPath) return;
         
         var dailiesFolder = findDailiesFolder(projectFolderPath);
-        if (!dailiesFolder) {
-            return;
+        if (!dailiesFolder) return;
+        
+        // Show dialog
+        var dialogResult = showDailiesDialog(dailiesFolder);
+        if (!dialogResult) return;
+        
+        var targetFolder;
+        
+        if (dialogResult.isRegular) {
+            // Regular date-based folder
+            targetFolder = createDateFolder(dailiesFolder);
+        } else {
+            // Custom subfolder
+            var dateFolder = createDateFolder(dailiesFolder);
+            if (!dateFolder) return;
+            
+            if (dialogResult.useExistingFolder) {
+                // Use existing folder
+                targetFolder = new Folder(dateFolder.fsName + "\\" + dialogResult.customName);
+                if (!targetFolder.exists) {
+                    alert("Error: Selected folder no longer exists!");
+                    return;
+                }
+            } else {
+                // Create new folder
+                targetFolder = createCustomFolder(dateFolder, dialogResult.customName);
+            }
         }
         
-        var dateFolder = createDateFolder(dailiesFolder);
-        if (!dateFolder) {
-            return;
-        }
+        if (!targetFolder) return;
         
-        setupRenderQueue(dateFolder);
-        
-        debugLog("=== COMPLETE ===\nOutput path: " + dateFolder.fsName);
+        setupRenderQueue(targetFolder);
+        alert("Render queue set up successfully!");
     }
 
     main();

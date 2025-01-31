@@ -108,9 +108,37 @@ Usage:
             var items = todayFolder.getFiles();
             for (var i = 0; i < items.length; i++) {
                 if (items[i] instanceof Folder) {
-                    folders.push(items[i].name);
+                    // Get folder stats safely
+                    try {
+                        var stats = items[i].getFiles();
+                        folders.push({
+                            name: items[i].name,
+                            modified: items[i].modified ? new Date(items[i].modified).getTime() : 0,
+                            path: items[i]
+                        });
+                    } catch(e) {
+                        debugLog("Error getting folder stats: " + e);
+                        // Still add the folder even if we can't get stats
+                        folders.push({
+                            name: items[i].name,
+                            modified: 0,
+                            path: items[i]
+                        });
+                    }
                 }
             }
+            
+            // Sort folders by modification time, most recent first
+            // Handle cases where modified time might be invalid
+            folders.sort(function(a, b) {
+                var timeA = a.modified || 0;
+                var timeB = b.modified || 0;
+                if (timeA === timeB) {
+                    // If times are equal or invalid, sort by name
+                    return a.name.localeCompare(b.name);
+                }
+                return timeB - timeA;
+            });
         }
         
         return folders;
@@ -156,13 +184,13 @@ Usage:
         var folderDropdown = dropdownGroup.add("dropdownlist");
         folderDropdown.preferredSize.width = 200;
         
-        // Get existing folders
+        // Get existing folders sorted by modification time
         var existingFolders = getTodayFolders(dailiesFolder);
         folderDropdown.add("item", "-- Create New Folder --");
         for (var i = 0; i < existingFolders.length; i++) {
-            folderDropdown.add("item", existingFolders[i]);
+            folderDropdown.add("item", existingFolders[i].name);
         }
-        folderDropdown.selection = 0;
+        folderDropdown.selection = existingFolders.length > 0 ? 1 : 0; // Select most recent folder if available
 
         // Custom folder name input
         var inputGroup = customGroup.add("group");
@@ -180,7 +208,12 @@ Usage:
             customGroup.visible = false; 
         };
         nonRegularRadio.onClick = function() { 
-            customGroup.visible = true; 
+            customGroup.visible = true;
+            if (existingFolders.length > 0) {
+                folderDropdown.selection = 1; // Select most recent folder
+                inputGroup.visible = false;
+                customInput.text = existingFolders[0].name;
+            }
         };
 
         // Handle dropdown selection
@@ -339,14 +372,24 @@ Usage:
     }
 
     function setupRenderQueue(outputPath) {
-        var selectedItems = app.project.selection;
         var comps = [];
+        var selectedItems = app.project.selection;
         
         debugLog("Selected items: " + selectedItems.length);
         
-        for (var i = 0; i < selectedItems.length; i++) {
-            if (selectedItems[i] instanceof CompItem) {
-                comps.push(selectedItems[i]);
+        // Check if we have selected items in project panel
+        if (selectedItems.length > 0) {
+            // Use selected items
+            for (var i = 0; i < selectedItems.length; i++) {
+                if (selectedItems[i] instanceof CompItem) {
+                    comps.push(selectedItems[i]);
+                }
+            }
+        } else {
+            // Use active composition if no selection
+            var activeComp = app.project.activeItem;
+            if (activeComp instanceof CompItem) {
+                comps.push(activeComp);
             }
         }
         
@@ -363,10 +406,26 @@ Usage:
             debugLog("Setting output path for " + comps[i].name + ":\n" + outputFile.fsName);
             outputModule.file = outputFile;
         }
+        
+        return comps.length; // Return number of compositions added
     }
 
     function main() {
-        debugLog("=== STARTING DAILIES SETUP ===");
+        // Check if there's either an active comp or selected items first
+        var selectedItems = app.project.selection;
+        var hasValidSelection = false;
+        
+        for (var i = 0; i < selectedItems.length; i++) {
+            if (selectedItems[i] instanceof CompItem) {
+                hasValidSelection = true;
+                break;
+            }
+        }
+        
+        if (!hasValidSelection && !(app.project.activeItem instanceof CompItem)) {
+            alert("No active composition found. Please select or open a composition first.");
+            return;
+        }
         
         var projectFolderPath = getProjectFolderPath();
         if (!projectFolderPath) return;
@@ -374,7 +433,7 @@ Usage:
         var dailiesFolder = findDailiesFolder(projectFolderPath);
         if (!dailiesFolder) return;
         
-        // Show dialog
+        // Show dialog first
         var dialogResult = showDailiesDialog(dailiesFolder);
         if (!dialogResult) return;
         
@@ -403,8 +462,8 @@ Usage:
         
         if (!targetFolder) return;
         
+        // Add to render queue using active comp or selections
         setupRenderQueue(targetFolder);
-        alert("Render queue set up successfully!");
     }
 
     main();

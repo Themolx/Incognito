@@ -57,6 +57,14 @@
         var basePathText = basePathGroup.add("statictext", undefined, "Base Path: " + basePath);
         basePathText.enabled = false;
 
+        // Add preview of new path
+        var previewGroup = dialog.add("group");
+        previewGroup.orientation = "row";
+        var previewLabel = previewGroup.add("statictext", undefined, "Preview: ");
+        var previewPath = previewGroup.add("edittext", undefined, projPath);
+        previewPath.preferredSize.width = 300;
+        previewPath.enabled = false;
+
         // Add checkbox for auto week increment
         var weekGroup = dialog.add("group");
         weekGroup.orientation = "row";
@@ -104,6 +112,32 @@
                 isWeek: token.toLowerCase().match(/ww\d{2}/) ? true : false,
                 isVersion: isVersion ? true : false
             });
+
+            // Add change listener to update preview
+            tokenInput.onChange = function() {
+                updatePathPreview();
+            };
+        }
+
+        // Function to update path preview
+        function updatePathPreview() {
+            var previewPathStr = basePath;
+            var remainingPath = projPath.substring(basePath.length);
+            var currentWeekToken = getWeekToken(projPath);
+            var newWeekToken = autoWeekCheck.value ? incrementWeekNumber(currentWeekToken) : null;
+            
+            for (var i = 0; i < tokenInputs.length; i++) {
+                var tokenInfo = tokenInputs[i];
+                if (tokenInfo.isWeek && autoWeekCheck.value) {
+                    remainingPath = remainingPath.replace(tokenInfo.original, newWeekToken);
+                } else if (tokenInfo.isVersion) {
+                    remainingPath = remainingPath.replace(tokenInfo.original, resetVersion());
+                } else if (tokenInfo.input.text !== tokenInfo.original) {
+                    remainingPath = remainingPath.replace(tokenInfo.original, tokenInfo.input.text);
+                }
+            }
+            
+            previewPath.text = previewPathStr + remainingPath;
         }
 
         // Update week token input state when checkbox changes
@@ -113,6 +147,7 @@
                     tokenInputs[i].input.enabled = !autoWeekCheck.value;
                 }
             }
+            updatePathPreview();
         };
 
         // Add buttons
@@ -208,95 +243,91 @@
         return "ww" + (weekNum < 10 ? "0" : "") + weekNum;
     }
 
-    function updateExpressions(comp, oldName, newName) {
-        // Update expressions in all properties of all layers
-        for (var i = 1; i <= comp.numLayers; i++) {
-            var layer = comp.layer(i);
-            
-            // Go through all properties
-            var props = layer.property("Effects");
-            if (props) {
-                for (var j = 1; j <= props.numProperties; j++) {
-                    var effect = props.property(j);
-                    for (var k = 1; k <= effect.numProperties; k++) {
-                        var prop = effect.property(k);
-                        if (prop.expression && prop.expression.indexOf(oldName) !== -1) {
-                            prop.expression = prop.expression.replace(new RegExp(oldName, 'g'), newName);
-                        }
-                    }
-                }
-            }
-            
-            // Check transform properties
-            var transform = layer.transform;
-            for (var j = 1; j <= transform.numProperties; j++) {
-                var prop = transform.property(j);
-                if (prop.expression && prop.expression.indexOf(oldName) !== -1) {
-                    prop.expression = prop.expression.replace(new RegExp(oldName, 'g'), newName);
-                }
-            }
-        }
-    }
-
     function updateCompNames(item, currentWeekToken, newWeekToken) {
         if (item instanceof CompItem) {
             var oldName = item.name;
-            // Update composition name if it contains the week token
-            if (item.name.toLowerCase().indexOf(currentWeekToken.toLowerCase()) !== -1) {
-                var newName = item.name.replace(new RegExp(currentWeekToken, 'gi'), newWeekToken);
-                item.name = newName;
-                
-                // Update expressions in all comps that might reference this comp
-                for (var i = 1; i <= app.project.numItems; i++) {
-                    var comp = app.project.item(i);
-                    if (comp instanceof CompItem) {
-                        updateExpressions(comp, oldName, newName);
-                    }
-                }
+            var newName = oldName;
+            
+            if (currentWeekToken && newWeekToken) {
+                newName = newName.replace(currentWeekToken, newWeekToken);
             }
             
-            // Search through all layers in the composition
-            for (var i = 1; i <= item.numLayers; i++) {
-                var layer = item.layer(i);
-                if (layer.source instanceof CompItem) {
-                    updateCompNames(layer.source, currentWeekToken, newWeekToken);
-                }
+            if (newName !== oldName) {
+                item.name = newName;
+                // Update expressions in this comp and all comps that use this comp
+                updateExpressionsInAllComps(oldName, newName);
+            }
+            
+            // Process nested items
+            for (var i = 1; i <= item.numItems; i++) {
+                updateCompNames(item.item(i), currentWeekToken, newWeekToken);
+            }
+        } else if (item instanceof FolderItem) {
+            for (var i = 1; i <= item.numItems; i++) {
+                updateCompNames(item.item(i), currentWeekToken, newWeekToken);
             }
         }
     }
 
-    function processWeekIncrement() {
+    function updateExpressionsInAllComps(oldName, newName) {
         var proj = app.project;
-        if (!proj) return alert("No project is open!");
-
-        // Get project file path
-        var projPath = proj.file ? proj.file.fsName : "";
-        if (!projPath) return alert("Please save the project first!");
-
-        // Extract current week token
-        var currentWeekToken = getWeekToken(projPath);
-        if (!currentWeekToken) return alert("No week token found in project path!");
-
-        // Generate new week token
-        var newWeekToken = incrementWeekNumber(currentWeekToken);
-        if (!newWeekToken) return alert("Failed to increment week number!");
-
-        // Create new folder path
-        var newPath = projPath.replace(new RegExp(currentWeekToken, 'gi'), newWeekToken);
-        var newFolder = new Folder(new File(newPath).parent);
-        if (!newFolder.exists) {
-            newFolder.create();
-        }
-
-        // Recursively update all compositions
         for (var i = 1; i <= proj.numItems; i++) {
-            updateCompNames(proj.item(i), currentWeekToken, newWeekToken);
+            var item = proj.item(i);
+            if (item instanceof CompItem) {
+                updateExpressions(item, oldName, newName);
+            }
         }
+    }
 
-        // Save project with new name
-        var newFile = new File(newPath);
-        proj.save(newFile);
-        alert("Project saved with incremented week number!\nNew path: " + newPath);
+    function updateExpressions(comp, oldName, newName) {
+        for (var i = 1; i <= comp.numLayers; i++) {
+            var layer = comp.layer(i);
+            scanAndUpdateExpressions(layer, oldName, newName);
+        }
+    }
+
+    function scanAndUpdateExpressions(layer, oldName, newName) {
+        try {
+            // Recursive function to scan all properties
+            function scanProperty(prop) {
+                try {
+                    // Check if this property has an expression
+                    if (prop.canSetExpression && prop.expression) {
+                        var expr = prop.expression;
+                        if (expr.indexOf(oldName) !== -1) {
+                            // Simple direct replacement of the name
+                            prop.expression = expr.replace(new RegExp(oldName, 'g'), newName);
+                        }
+                    }
+
+                    // If property has sub-properties, scan them
+                    if (prop.propertyType === PropertyType.INDEXED_GROUP || 
+                        prop.propertyType === PropertyType.NAMED_GROUP) {
+                        for (var i = 1; i <= prop.numProperties; i++) {
+                            scanProperty(prop.property(i));
+                        }
+                    }
+                } catch (err) {
+                    // Skip any properties that can't be accessed
+                }
+            }
+
+            // Start scanning from the main property groups
+            if (layer.effect) scanProperty(layer.effect);
+            if (layer.transform) scanProperty(layer.transform);
+            if (layer.mask) scanProperty(layer.mask);
+            if (layer.text) scanProperty(layer.text);
+            if (layer.materialOption) scanProperty(layer.materialOption);
+            if (layer.geometryOption) scanProperty(layer.geometryOption);
+            if (layer.audio) scanProperty(layer.audio);
+            
+            // Check layer source if it's a property group
+            if (layer.source && layer.source.propertyType) {
+                scanProperty(layer.source);
+            }
+        } catch (err) {
+            // Skip any layers that can't be accessed
+        }
     }
 
     // Create and show UI

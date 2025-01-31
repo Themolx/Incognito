@@ -35,115 +35,6 @@
         return "v1";
     }
 
-    function getAllWeekTokens(path) {
-        var weekRegex = /ww\d{2}/gi;
-        return path.match(weekRegex) || [];
-    }
-
-    function incrementAllWeekNumbers(weekTokens) {
-        var newTokens = [];
-        for (var i = 0; i < weekTokens.length; i++) {
-            var weekNum = parseInt(weekTokens[i].substring(2));
-            weekNum = (weekNum + 1) % 53; // Loop back to 1 after week 52
-            if (weekNum === 0) weekNum = 1;
-            newTokens.push("ww" + (weekNum < 10 ? "0" : "") + weekNum);
-        }
-        return newTokens;
-    }
-
-    function processWeekIncrement() {
-        var proj = app.project;
-        if (!proj) return alert("No project is open!");
-
-        // Get project file path
-        var projPath = proj.file ? proj.file.fsName : "";
-        if (!projPath) return alert("Please save the project first!");
-
-        // Extract current week tokens
-        var currentWeekTokens = getAllWeekTokens(projPath);
-        if (!currentWeekTokens.length) return alert("No week tokens found in project path!");
-
-        // Generate new week tokens
-        var newWeekTokens = incrementAllWeekNumbers(currentWeekTokens);
-
-        // Update path and compositions
-        var newPath = projPath;
-        for (var i = 0; i < currentWeekTokens.length; i++) {
-            newPath = newPath.replace(currentWeekTokens[i], newWeekTokens[i]);
-            
-            // Update compositions
-            for (var j = 1; j <= proj.numItems; j++) {
-                updateCompNames(proj.item(j), currentWeekTokens[i], newWeekTokens[i]);
-            }
-        }
-
-        // Create new folder and save
-        var newFolder = new Folder(new File(newPath).parent);
-        if (!newFolder.exists) {
-            newFolder.create();
-        }
-
-        var newFile = new File(newPath);
-        proj.save(newFile);
-        alert("Project saved with incremented week numbers!\nNew path: " + newPath);
-    }
-
-    function processPathUpdate(tokenInputs, projPath) {
-        try {
-            var basePath = getPathBeforeShots(projPath);
-            var remainingPath = projPath.substring(basePath.length);
-            var pathParts = remainingPath.split(/[\\\/]/);
-            var newPathParts = [];
-            var changes = false;
-
-            // Debug alert
-            alert("Processing path:\nBase: " + basePath + "\nRemaining: " + remainingPath);
-
-            // Process each path part
-            for (var i = 0; i < pathParts.length; i++) {
-                var part = pathParts[i];
-                var newPart = part;
-                var tokensInPart = [];
-
-                // Find all tokens in this path part
-                for (var j = 0; j < tokenInputs.length; j++) {
-                    var tokenInfo = tokenInputs[j];
-                    if (part.indexOf(tokenInfo.original) !== -1) {
-                        tokensInPart.push(tokenInfo);
-                    }
-                }
-
-                // Process tokens in this part
-                for (var j = 0; j < tokensInPart.length; j++) {
-                    var tokenInfo = tokensInPart[j];
-                    if (tokenInfo.input.text === "") {
-                        // If input is empty, remove the token and any surrounding delimiters
-                        newPart = newPart.replace(new RegExp("_?" + tokenInfo.original + "_?", "g"), "");
-                        changes = true;
-                    } else if (tokenInfo.input.text !== tokenInfo.original) {
-                        newPart = newPart.replace(new RegExp(tokenInfo.original, "g"), tokenInfo.input.text);
-                        changes = true;
-                    }
-                }
-
-                // Only add non-empty parts to the new path
-                if (newPart.trim() !== "") {
-                    newPathParts.push(newPart);
-                }
-            }
-
-            var newPath = basePath + newPathParts.join("/");
-            
-            // Debug alert
-            alert("New path created: " + newPath);
-            
-            return { path: newPath, changes: changes };
-        } catch (error) {
-            alert("Error in processPathUpdate: " + error.toString());
-            return { path: projPath, changes: false };
-        }
-    }
-
     function buildUI(thisObj) {
         var dialog = (thisObj instanceof Panel) ? thisObj : new Window("dialog", "Path Token Editor");
         dialog.orientation = "column";
@@ -170,7 +61,7 @@
         var weekGroup = dialog.add("group");
         weekGroup.orientation = "row";
         var autoWeekCheck = weekGroup.add("checkbox", undefined, "Auto Increment Week Number");
-        autoWeekCheck.value = true;
+        autoWeekCheck.value = true; // Default to auto increment
 
         // Create scrollable area for tokens
         var scrollGroup = dialog.add("group");
@@ -181,9 +72,6 @@
         
         var tokens = splitPathIntoTokens(projPath);
         var tokenInputs = [];
-
-        // Debug alert
-        alert("Found tokens: " + tokens.join(", "));
 
         // Create input fields for each token
         for (var i = 0; i < tokens.length; i++) {
@@ -235,56 +123,62 @@
 
         // Handle button clicks
         processButton.onClick = function() {
-            try {
-                alert("Process button clicked");
-                
-                var result = processPathUpdate(tokenInputs, projPath);
-                
-                if (!result.changes) {
-                    alert("No changes were made to tokens.");
-                    return;
+            var basePath = getPathBeforeShots(projPath);
+            var remainingPath = projPath.substring(basePath.length);
+            var newPath = basePath;
+            var changes = false;
+            var currentWeekToken = getWeekToken(projPath);
+            var newWeekToken = autoWeekCheck.value ? incrementWeekNumber(currentWeekToken) : null;
+            
+            // Replace tokens that were changed
+            for (var i = 0; i < tokenInputs.length; i++) {
+                var tokenInfo = tokenInputs[i];
+                if (tokenInfo.isWeek && autoWeekCheck.value) {
+                    remainingPath = remainingPath.replace(tokenInfo.original, newWeekToken);
+                    changes = true;
+                } else if (tokenInfo.isVersion) {
+                    remainingPath = remainingPath.replace(tokenInfo.original, resetVersion());
+                    changes = true;
+                } else if (tokenInfo.input.text !== tokenInfo.original) {
+                    remainingPath = remainingPath.replace(tokenInfo.original, tokenInfo.input.text);
+                    changes = true;
                 }
-
-                // Create new folder if needed
-                var newFolder = new Folder(new File(result.path).parent);
-                if (!newFolder.exists) {
-                    newFolder.create();
-                }
-
-                // Update compositions
-                for (var i = 0; i < tokenInputs.length; i++) {
-                    var tokenInfo = tokenInputs[i];
-                    if (tokenInfo.input.text === "") {
-                        // Handle deleted tokens in compositions
-                        for (var j = 1; j <= proj.numItems; j++) {
-                            updateCompNames(proj.item(j), tokenInfo.original, "");
-                        }
-                    } else if (!tokenInfo.isWeek && tokenInfo.input.text !== tokenInfo.original) {
-                        for (var j = 1; j <= proj.numItems; j++) {
-                            updateCompNames(proj.item(j), tokenInfo.original, tokenInfo.input.text);
-                        }
-                    }
-                }
-
-                // Handle week tokens if auto increment is enabled
-                if (autoWeekCheck.value) {
-                    var weekTokens = getAllWeekTokens(projPath);
-                    var newWeekTokens = incrementAllWeekNumbers(weekTokens);
-                    for (var i = 0; i < weekTokens.length; i++) {
-                        for (var j = 1; j <= proj.numItems; j++) {
-                            updateCompNames(proj.item(j), weekTokens[i], newWeekTokens[i]);
-                        }
-                    }
-                }
-
-                // Save project with new name
-                var newFile = new File(result.path);
-                proj.save(newFile);
-                alert("Project saved with updated tokens!\nNew path: " + result.path);
-                dialog.close();
-            } catch (error) {
-                alert("Error in process button: " + error.toString());
             }
+
+            newPath += remainingPath;
+
+            if (!changes) {
+                alert("No changes were made to tokens.");
+                return;
+            }
+
+            // Create new folder if needed
+            var newFolder = new Folder(new File(newPath).parent);
+            if (!newFolder.exists) {
+                newFolder.create();
+            }
+
+            // Update compositions that contain changed tokens
+            if (autoWeekCheck.value && currentWeekToken && newWeekToken) {
+                for (var j = 1; j <= proj.numItems; j++) {
+                    updateCompNames(proj.item(j), currentWeekToken, newWeekToken);
+                }
+            }
+
+            for (var i = 0; i < tokenInputs.length; i++) {
+                var tokenInfo = tokenInputs[i];
+                if (!tokenInfo.isWeek && tokenInfo.input.text !== tokenInfo.original) {
+                    for (var j = 1; j <= proj.numItems; j++) {
+                        updateCompNames(proj.item(j), tokenInfo.original, tokenInfo.input.text);
+                    }
+                }
+            }
+
+            // Save project with new name
+            var newFile = new File(newPath);
+            proj.save(newFile);
+            alert("Project saved with updated tokens!\nNew path: " + newPath);
+            dialog.close();
         }
 
         cancelButton.onClick = function() {
@@ -296,6 +190,22 @@
         dialog.center();
         
         return dialog;
+    }
+
+    function getWeekToken(path) {
+        var weekRegex = /ww\d{2}/i;
+        var match = path.match(weekRegex);
+        return match ? match[0] : null;
+    }
+
+    function incrementWeekNumber(weekToken) {
+        if (!weekToken) return null;
+        
+        var weekNum = parseInt(weekToken.substring(2));
+        weekNum = (weekNum + 1) % 53; // Loop back to 1 after week 52
+        if (weekNum === 0) weekNum = 1;
+        
+        return "ww" + (weekNum < 10 ? "0" : "") + weekNum;
     }
 
     function updateExpressions(comp, oldName, newName) {
@@ -353,6 +263,40 @@
                 }
             }
         }
+    }
+
+    function processWeekIncrement() {
+        var proj = app.project;
+        if (!proj) return alert("No project is open!");
+
+        // Get project file path
+        var projPath = proj.file ? proj.file.fsName : "";
+        if (!projPath) return alert("Please save the project first!");
+
+        // Extract current week token
+        var currentWeekToken = getWeekToken(projPath);
+        if (!currentWeekToken) return alert("No week token found in project path!");
+
+        // Generate new week token
+        var newWeekToken = incrementWeekNumber(currentWeekToken);
+        if (!newWeekToken) return alert("Failed to increment week number!");
+
+        // Create new folder path
+        var newPath = projPath.replace(new RegExp(currentWeekToken, 'gi'), newWeekToken);
+        var newFolder = new Folder(new File(newPath).parent);
+        if (!newFolder.exists) {
+            newFolder.create();
+        }
+
+        // Recursively update all compositions
+        for (var i = 1; i <= proj.numItems; i++) {
+            updateCompNames(proj.item(i), currentWeekToken, newWeekToken);
+        }
+
+        // Save project with new name
+        var newFile = new File(newPath);
+        proj.save(newFile);
+        alert("Project saved with incremented week number!\nNew path: " + newPath);
     }
 
     // Create and show UI

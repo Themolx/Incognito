@@ -12,7 +12,9 @@ TIFF files (full CG shots):
 - Bypass loading raw footage.
 - Set the input colorspace to "color_picking".
 
-Output paths are built using forward slashes and the "####" marker.
+Export paths are now structured as:
+    <OUTPUT_BASE_DIR>/<shot>/<version>/<shot>_<version>.####.exr
+
 This version processes multiple selected Read nodes.
 """
 
@@ -254,8 +256,8 @@ def process_single_plate(read_node, batch_mode=False, version_choice_override=No
             if batch_mode and version_choice_override is not None:
                 version_choice = version_choice_override
             else:
-                msg = f"Shot {delivery_shot} has already been delivered as {latest_version}.\n" \
-                      f"Last delivery was from source {version_info['source_version']} on {version_info['timestamp']}.\n\n"
+                msg = (f"Shot {delivery_shot} has already been delivered as {latest_version}.\n"
+                       f"Last delivery was from source {version_info['source_version']} on {version_info['timestamp']}.\n\n")
                 version_choice = nuke.choice("Version Options", f"Shot {delivery_shot} already delivered", 
                                              ["Cancel", f"Use new version ({next_version})", "Overwrite existing v001"])
             if version_choice == 0:
@@ -269,7 +271,8 @@ def process_single_plate(read_node, batch_mode=False, version_choice_override=No
                 if not batch_mode:
                     nuke.message(f"WARNING: Overwriting existing v001 delivery for {delivery_shot}!")
         
-        output_dir = f"{OUTPUT_BASE_DIR}/{delivery_shot}"
+        # New folder structure: <OUTPUT_BASE_DIR>/<shot>/<version>/
+        output_dir = f"{OUTPUT_BASE_DIR}/{delivery_shot}/{delivery_version}"
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
         output_path = f"{output_dir}/{delivery_shot}_{delivery_version}.####.exr"
@@ -353,8 +356,8 @@ def process_single_plate(read_node, batch_mode=False, version_choice_override=No
         if batch_mode and version_choice_override is not None:
             version_choice = version_choice_override
         else:
-            msg = f"Shot {original_shot} has already been delivered as {latest_version}.\n" \
-                  f"Last delivery was from source {version_info['source_version']} on {version_info['timestamp']}.\n\n"
+            msg = (f"Shot {original_shot} has already been delivered as {latest_version}.\n"
+                   f"Last delivery was from source {version_info['source_version']} on {version_info['timestamp']}.\n\n")
             version_choice = nuke.choice("Version Options", f"Shot {original_shot} already delivered",
                                          ["Cancel", f"Use new version ({next_version})", "Overwrite existing v001"])
         if version_choice == 0:
@@ -368,7 +371,8 @@ def process_single_plate(read_node, batch_mode=False, version_choice_override=No
             if not batch_mode:
                 nuke.message(f"WARNING: Overwriting existing v001 delivery for {original_shot}!")
     
-    output_dir = f"{OUTPUT_BASE_DIR}/{original_shot}"
+    # New folder structure: <OUTPUT_BASE_DIR>/<shot>/<version>/
+    output_dir = f"{OUTPUT_BASE_DIR}/{original_shot}/{delivery_version}"
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     output_path = f"{output_dir}/{original_shot}_{delivery_version}.####.exr"
@@ -508,4 +512,16 @@ menu.addCommand('Batch Process Multiple Plates', batch_process_plates)
 menu.addCommand('Edit Settings', 'nuke.tab("Preferences").showPanel("PlateProcessor")', '')
 
 if __name__ == "__main__":
+    # Reposition all selected Read nodes in a grid pattern (spaced 200px apart in X, fixed Y)
+    read_nodes = nuke.selectedNodes("Read")
+    if read_nodes:
+        fixed_y = read_nodes[0].ypos()
+        read_nodes.sort(key=lambda n: n.xpos())
+        start_x = read_nodes[0].xpos()
+        for i, node in enumerate(read_nodes):
+            node.setXpos(start_x + i * 200)
+            node.setYpos(fixed_y)
+    else:
+        nuke.message("No selected Read nodes found.")
+    
     process_plate()

@@ -59,8 +59,15 @@ SHOT_MAPPING = {
     'ME1_0590': 'EP01_G_590',
     'ME1_0591': 'EP01_G_591',
     'ME1_0595': 'EP01_G_595',
+    'ME1_0630': 'EP01_G_630',  # New mapping added
+    'ME1_0640': 'EP01_G_640',  # New mapping added
+    'ME1_0650': 'EP01_G_650',  # New mapping added
+    'ME1_0660': 'EP01_D_660',  # New mapping added
+    'ME1_0670': 'EP01_D_670',  # New mapping added
+    'ME1_0680': 'EP01_D_680',  # New mapping added
     'ME1_0700': 'EP01_G_700',
     'ME1_0710': 'EP01_G_710',
+    'ME1_0715': 'EP01_D_715',
     'ME1_0720': 'EP01_G_720',
     'ME1_0730': 'EP01_D_730',
     'ME1_0740': 'EP01_D_740',

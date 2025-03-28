@@ -24,7 +24,7 @@ import re
 import datetime
 import csv
 
-# Shot mapping dictionary
+# Shot name mapping dictionary
 SHOT_MAPPING = {
     'ME1_0050': 'EP01_G_050',
     'ME1_0060': 'EP01_G_060',
@@ -49,7 +49,7 @@ SHOT_MAPPING = {
     'ME1_0250': 'EP01_G_250',
     'ME1_0260': 'EP01_G_260',
     'ME1_0270': 'EP01_G_270',
-    'ME1_0275': 'EP01_G_275',
+    'ME1_0275': 'EP01_G_275',  # New mapping added
     'ME1_0280': 'EP01_G_280',
     'ME1_0290': 'EP01_G_290',
     'ME1_0300': 'EP01_G_300',
@@ -67,17 +67,28 @@ SHOT_MAPPING = {
     'ME1_0420': 'EP01_D_420',
     'ME1_0430': 'EP01_D_430',
     'ME1_0440': 'EP01_G_440',
+    'ME1_0450': 'EP01_D_450',  # New mapping added for ME1_0450
     'ME1_0470': 'EP01_D_470',
     'ME1_0480': 'EP01_D_480',
     'ME1_0490': 'EP01_D_490',
     'ME1_0500': 'EP01_G_500',
     'ME1_0510': 'EP01_D_510',
     'ME1_0520': 'EP01_D_520',
+    'ME1_0560': 'EP01_G_560',
     'ME1_0570': 'EP01_G_570',
     'ME1_0580': 'EP01_D_580',
     'ME1_0590': 'EP01_G_590',
+    'ME1_0591': 'EP01_G_591',
+    'ME1_0595': 'EP01_G_595',
+    'ME1_0630': 'EP01_G_630',  # New mapping added
+    'ME1_0640': 'EP01_G_640',  # New mapping added
+    'ME1_0650': 'EP01_G_650',  # New mapping added
+    'ME1_0660': 'EP01_D_660',  # New mapping added
+    'ME1_0670': 'EP01_D_670',  # New mapping added
+    'ME1_0680': 'EP01_D_680',  # New mapping added
     'ME1_0700': 'EP01_G_700',
     'ME1_0710': 'EP01_G_710',
+    'ME1_0715': 'EP01_D_715',
     'ME1_0720': 'EP01_G_720',
     'ME1_0730': 'EP01_D_730',
     'ME1_0740': 'EP01_D_740',
@@ -88,8 +99,10 @@ SHOT_MAPPING = {
     'ME1_0790': 'EP01_D_790',
     'ME1_0800': 'EP01_D_800',
     'ME1_0810': 'EP01_D_810',
+    'ME1_0820': 'EP01_D_820',
     'ME1_0830': 'EP01_D_830',
     'ME1_0832': 'EP01_D_832',
+    'ME1_0840': 'EP01_D_840',
     'ME1_0850': 'EP01_G_850',
     'ME1_0860': 'EP01_G_860',
     'ME1_0870': 'EP01_G_870',
@@ -246,30 +259,29 @@ def process_single_plate(read_node, batch_mode=False, version_choice_override=No
         delivery_shot = SHOT_MAPPING.get(shot_name, shot_name)
         source_version = extract_version(file_path) or "unknown"
         
+        # Use internal version as delivery version instead of converting to v001
+        delivery_version = source_version or "v001"
+        
         latest_version, version_info = get_latest_delivered_version(delivery_shot)
-        delivery_version = "v001"
         
         if latest_version:
-            latest_ver_num = int(latest_version[1:])
-            next_ver_num = latest_ver_num + 1
-            next_version = f"v{next_ver_num:03d}"
             if batch_mode and version_choice_override is not None:
                 version_choice = version_choice_override
             else:
                 msg = (f"Shot {delivery_shot} has already been delivered as {latest_version}.\n"
                        f"Last delivery was from source {version_info['source_version']} on {version_info['timestamp']}.\n\n")
                 version_choice = nuke.choice("Version Options", f"Shot {delivery_shot} already delivered", 
-                                             ["Cancel", f"Use new version ({next_version})", "Overwrite existing v001"])
+                                             ["Cancel", f"Use source version ({delivery_version})", "Overwrite existing version"])
             if version_choice == 0:
                 if not batch_mode:
                     nuke.message("Delivery cancelled")
                 return False, "Delivery cancelled", {}
             elif version_choice == 1:
-                delivery_version = next_version
+                # Keep delivery_version as source_version (already set above)
+                pass
             elif version_choice == 2:
-                delivery_version = "v001"
                 if not batch_mode:
-                    nuke.message(f"WARNING: Overwriting existing v001 delivery for {delivery_shot}!")
+                    nuke.message(f"WARNING: Overwriting existing delivery for {delivery_shot}!")
         
         # New folder structure: <OUTPUT_BASE_DIR>/<shot>/<version>/
         output_dir = f"{OUTPUT_BASE_DIR}/{delivery_shot}/{delivery_version}"
@@ -346,30 +358,29 @@ def process_single_plate(read_node, batch_mode=False, version_choice_override=No
     
     source_version = extract_version(file_path) or "unknown"
     
+    # Use internal version as delivery version instead of converting to v001
+    delivery_version = source_version or "v001"
+    
     latest_version, version_info = get_latest_delivered_version(original_shot)
-    delivery_version = "v001"
     
     if latest_version:
-        latest_ver_num = int(latest_version[1:])
-        next_ver_num = latest_ver_num + 1
-        next_version = f"v{next_ver_num:03d}"
         if batch_mode and version_choice_override is not None:
             version_choice = version_choice_override
         else:
             msg = (f"Shot {original_shot} has already been delivered as {latest_version}.\n"
                    f"Last delivery was from source {version_info['source_version']} on {version_info['timestamp']}.\n\n")
             version_choice = nuke.choice("Version Options", f"Shot {original_shot} already delivered",
-                                         ["Cancel", f"Use new version ({next_version})", "Overwrite existing v001"])
+                                         ["Cancel", f"Use source version ({delivery_version})", "Overwrite existing version"])
         if version_choice == 0:
             if not batch_mode:
                 nuke.message("Delivery cancelled")
             return False, "Delivery cancelled", {"original_read": original_read, "copy_metadata": copy_metadata}
         elif version_choice == 1:
-            delivery_version = next_version
+            # Keep delivery_version as source_version (already set above)
+            pass
         elif version_choice == 2:
-            delivery_version = "v001"
             if not batch_mode:
-                nuke.message(f"WARNING: Overwriting existing v001 delivery for {original_shot}!")
+                nuke.message(f"WARNING: Overwriting existing delivery for {original_shot}!")
     
     # New folder structure: <OUTPUT_BASE_DIR>/<shot>/<version>/
     output_dir = f"{OUTPUT_BASE_DIR}/{original_shot}/{delivery_version}"

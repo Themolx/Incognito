@@ -328,12 +328,22 @@ def process_single_plate(read_node, batch_mode=False, version_choice_override=No
     shot_number = original_shot.split('_')[-1]
     original_shot_with_zero = f"{original_shot[:6]}_0{shot_number}"
     original_plate_path = f"{SOURCE_PLATES_DIR}/{original_shot_with_zero}/{original_shot_with_zero}.####.exr"
-    
+
     source_dir = os.path.dirname(original_plate_path.replace("####", "0001"))
+    # If original directory not found, try with L1 suffix
     if not os.path.exists(source_dir):
-        if not batch_mode:
-            nuke.message(f"Original plate directory not found: {source_dir}")
-        return False, f"Original plate directory not found: {source_dir}", {}
+        # Try alternate L1 naming pattern
+        original_shot_with_l1 = f"{original_shot_with_zero}_L1"
+        l1_plate_path = f"{SOURCE_PLATES_DIR}/{original_shot_with_l1}/{original_shot_with_l1}.####.exr"
+        l1_source_dir = os.path.dirname(l1_plate_path.replace("####", "0001"))
+        
+        if os.path.exists(l1_source_dir):
+            original_plate_path = l1_plate_path
+            source_dir = l1_source_dir
+        else:
+            if not batch_mode:
+                nuke.message(f"Original plate directory not found: {source_dir}\nAlso checked: {l1_source_dir}")
+            return False, f"Original plate directory not found: {source_dir} or {l1_source_dir}", {}
     
     original_read = nuke.createNode("Read")
     original_read['file'].setValue(original_plate_path)

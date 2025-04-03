@@ -1,0 +1,90 @@
+set cut_paste_input [stack 0]
+version 14.0 v5
+push $cut_paste_input
+Group {
+ name MolochMaskCreator2
+ tile_color 0x46c7c7ff
+ note_font "Bitstream Vera Sans Bold"
+ note_font_color 0xffffffff
+ selected true
+ xpos 62992
+ ypos 1042
+ addUserKnob {20 Settings l "Screen Mattes"}
+ addUserKnob {26 info l "" +STARTLINE T "This node copies alpha channels from inputs to dedicated matte channels.\nConnect screen mattes to inputs 1 and 2.\n\nOutputs:\n- matte_screen01.a (from input 1)\n- matte_screen02.a (from input 2)"}
+ addUserKnob {26 ""}
+ addUserKnob {26 credits l "" +STARTLINE T "Created by Martin Tomek"}
+}
+ Input {
+  inputs 0
+  name Call_03
+  xpos -168
+  ypos 278
+  number 3
+ }
+ Input {
+  inputs 0
+  name NTB_02
+  label NTB_matte_screen02
+  xpos -142
+  ypos 153
+  number 2
+ }
+ Input {
+  inputs 0
+  name PC_01
+  label matte_screen01
+  xpos -158
+  ypos 76
+  number 1
+ }
+ Input {
+  inputs 0
+  name Input
+  xpos 0
+ }
+add_layer {matte_screen01 matte_screen01.alpha matte_screen01.mask matte_screen01.a}
+ Copy {
+  inputs 2
+  from0 rgba.alpha
+  to0 matte_screen01.a
+  name Copy1
+  xpos 0
+  ypos 86
+  disable {{"\[exists parent.input1] ? 0 : 1"}}
+ }
+add_layer {matte_screen02 matte_screen02.alpha matte_screen02.mask matte_screen02.a}
+ Copy {
+  inputs 2
+  from0 rgba.alpha
+  to0 matte_screen02.a
+  name Copy2
+  xpos 0
+  ypos 153
+  disable {{"\[exists parent.input2] ? 0 : 1"}}
+ }
+add_layer {matte_screen03 matte_screen03.red matte_screen03.a}
+ Copy {
+  inputs 2
+  from0 rgba.alpha
+  to0 matte_screen03.a
+  name Copy3
+  selected true
+  xpos 0
+  ypos 281
+  disable {{"\[exists parent.input2] ? 0 : 1"}}
+ }
+ Output {
+  name Output1
+  xpos -19
+  ypos 537
+ }
+ Viewer {
+  frame 1041
+  frame_range 986-1124
+  fps 25
+  viewerProcess "sRGB (ACES)"
+  name Viewer1
+  xpos -19
+  ypos 463
+ }
+end_group
